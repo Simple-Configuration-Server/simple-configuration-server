@@ -1,0 +1,1 @@
+jvm_heap: !scs-ref '${scs-common}/common-vars.yaml#elasticsearch.jvm-heap'
