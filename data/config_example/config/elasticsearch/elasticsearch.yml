@@ -10,3 +10,4 @@ http.port: {{ http_port }}
 discovery.type: single-node
 xpack.security.enabled: true
 password: "{{ password }}"
+main: {{ main_host }}

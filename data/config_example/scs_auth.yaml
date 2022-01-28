@@ -1,0 +1,12 @@
+# Contains the authentication detailes for the SCS server
+x-scs-groups:
+  - &staging-group
+    whitelist:
+      - &staging-ip 172.16.134.12/32
+    allowed:
+      - staging/*
+
+accounts:
+  # Account for the staging server
+  - token: !scs-secret 'scs_accounts.yaml#staging-server'
+    <<: *staging-group

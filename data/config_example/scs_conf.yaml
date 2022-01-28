@@ -1,0 +1,10 @@
+# Example of a configuration file for the Simple Configuration Server
+auth:
+  private_only: true  # allow only private IP addresses
+  ip_whitelist: # Applied gobally. Accounts will be validated for this
+    - 127.0.0.1/32
+
+directories:
+  common: !scs-expand-env ${SCS_CONF_DIR}/common
+  config: !scs-expand-env ${SCS_CONF_DIR}/config
+  secrets: !scs-expand-env ${SCS_CONF_DIR}/secrets

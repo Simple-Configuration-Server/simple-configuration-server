@@ -1,4 +1,0 @@
-hosts: !scs-ref '${scs-common}/common-vars.yaml#hosts'
-http_port: !scs-ref '${scs-common}/common-vars.yaml#elasticsearch.port'
-node_name: "main ES host"
-password: !scs-ref '${scs-secrets}/es_secrets.yaml#password'
