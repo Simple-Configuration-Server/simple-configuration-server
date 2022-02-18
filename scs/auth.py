@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 import ipaddress
 
-from flask import Blueprint, request, abort
+from flask import Blueprint, request, abort, g
 
 from .configs import load_yaml, serialize_secrets
 
@@ -26,7 +26,9 @@ def check_auth():
         auth_header = request.headers['Authorization']
         token = auth_header.removeprefix('Bearer ')
         user = auth_mapping[token]
+        g.user = user
     except KeyError:
+        g.add_audit_event(event_type='unauthenticated')
         abort(401)
 
     # User is authenticated. Now check (1) if the ip is in the whitelist, (2)
@@ -36,6 +38,7 @@ def check_auth():
         if user_ip in network:
             break
     else:
+        g.add_audit_event(event_type='unauthorized_ip')
         abort(403)
 
     # Check if the user is allowed to access the provided url
@@ -43,6 +46,7 @@ def check_auth():
         if pattern.match(request.path):
             break
     else:
+        g.add_audit_event(event_type='unauthorized_path')
         abort(403)
 
 

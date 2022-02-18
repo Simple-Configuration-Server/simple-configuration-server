@@ -8,5 +8,6 @@ x-scs-groups:
 
 accounts:
   # Account for the staging server
-  - token: !scs-secret 'scs_accounts.yaml#staging-server'
+  - id: staging-server
+    token: !scs-secret 'scs_accounts.yaml#staging-server'
     <<: *staging-group

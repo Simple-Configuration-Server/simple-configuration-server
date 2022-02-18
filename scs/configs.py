@@ -14,7 +14,7 @@ import yaml
 import copy
 
 from flask import (
-    Blueprint, render_template, request, abort
+    Blueprint, render_template, request, abort, g
 )
 
 bp = Blueprint('configs', __name__, url_prefix='/configs')
@@ -293,9 +293,14 @@ def view_config_file(path: str, envdata: dict):
     if request.method == 'POST':
         env.update(request.get_json(force=True))
     secret_ids = serialize_secrets(env)
-    print(secret_ids)
     try:
-        return render_template(path.lstrip('/'), **env)
+        response = render_template(path.lstrip('/'), **env)
+        g.add_audit_event(event_type='config_loaded')
+        if secret_ids:
+            g.add_audit_event(
+                event_type='secrets_loaded', secrets=list(secret_ids),
+            )
+        return response
     except Exception:
         # return (
         #     "Error Parsing Config Template, Please check request body",
