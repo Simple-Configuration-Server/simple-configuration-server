@@ -14,7 +14,7 @@ import yaml
 import copy
 
 from flask import (
-    Blueprint, render_template, request, abort, current_app, Flask
+    Blueprint, render_template, request, abort
 )
 
 bp = Blueprint('configs', __name__, url_prefix='/configs')
@@ -184,7 +184,11 @@ def load_yaml(path: os.PathLike, is_secrets_file=False) -> dict:
 
         filecache.add_file(path, data)
 
-        return data
+    if is_secrets_file and loader.contents_changed:
+        with open(path, 'w', encoding='utf8') as yamlfile:
+            yaml.dump(data, yamlfile, sort_keys=False)
+
+    return data
 
 
 def load_env_file(relative_path: str) -> dict:
@@ -212,9 +216,9 @@ def get_env_file_hierarchy(relative_path: str) -> list[str]:
     return ordered_envfiles
 
 
-def serialize_secrets(env_data: dict) -> list[str]:
+def serialize_secrets(data: dict | list) -> list[str]:
     """
-    Serialize all secrets in the env_data
+    Serialize all secrets in the data
 
     Args:
         env_data:
@@ -225,13 +229,21 @@ def serialize_secrets(env_data: dict) -> list[str]:
         The id's of the secrets that were serialized
     """
     secret_ids = set()
-    for key, value in env_data.items():
-        if isinstance(value, dict):
-            serialized_secrets = serialize_secrets(value)
-            secret_ids.update(serialized_secrets)
-        elif isinstance(value, SCSSecret):
-            secret_ids.add(value.id)
-            env_data[key] = value.value
+    if isinstance(data, list):
+        for i, item in enumerate(data):
+            if isinstance(item, SCSSecret):
+                secret_ids.add(item.id)
+                data[i] = item.value
+            else:
+                serialize_secrets(item)
+    elif isinstance(data, dict):
+        for key, value in data.items():
+            if isinstance(value, (dict, list)):
+                serialized_secrets = serialize_secrets(value)
+                secret_ids.update(serialized_secrets)
+            elif isinstance(value, SCSSecret):
+                secret_ids.add(value.id)
+                data[key] = value.value
 
     return secret_ids
 
@@ -292,7 +304,7 @@ def view_config_file(path: str, envdata: dict):
         abort(400)
 
 
-def init_config_endpoints(
+def init(
         *, config_dir: os.PathLike, common_dir: os.PathLike,
         secrets_dir: os.PathLike
         ):

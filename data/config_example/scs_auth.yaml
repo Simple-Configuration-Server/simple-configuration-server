@@ -4,7 +4,7 @@ x-scs-groups:
     whitelist:
       - &staging-ip 172.16.134.12/32
     allowed:
-      - staging/*
+      - /configs/elasticsearch/*
 
 accounts:
   # Account for the staging server

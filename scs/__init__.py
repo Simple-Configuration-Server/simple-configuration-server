@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flask import Flask
 
-from . import configs
+from . import configs, auth
 
 current_dir = Path(__file__).absolute().parent
 
@@ -26,11 +26,13 @@ def create_app():
     })
 
     # Register blueprints
-    configs.init_config_endpoints(
+    configs.init(
         config_dir=Path(current_dir, '../data/config_example/config'),
         common_dir=Path(current_dir, '../data/config_example/common'),
         secrets_dir=Path(current_dir, '../data/config_example/secrets')
     )
     app.register_blueprint(configs.bp)
+    auth.init()
+    app.register_blueprint(auth.bp)
 
     return app
