@@ -3,8 +3,16 @@ auth:
   private_only: true  # allow only private IP addresses
   ip_whitelist: # Applied gobally. Accounts will be validated for this
     - 127.0.0.1/32
+    - 172.16.134.0/24
 
-directories:
-  common: !scs-expand-env ${SCS_CONF_DIR}/common
-  config: !scs-expand-env ${SCS_CONF_DIR}/config
-  secrets: !scs-expand-env ${SCS_CONF_DIR}/secrets
+configs:
+  directories:
+    common: !scs-expand-env ${SCS_CONFIG_DIR}/common
+    config: !scs-expand-env ${SCS_CONFIG_DIR}/config
+    secrets: !scs-expand-env ${SCS_CONFIG_DIR}/secrets
+
+audit:
+  log:
+    path: /var/scs/audit.log.jsonl
+    max_size_mb: 1
+    backup_count: 5

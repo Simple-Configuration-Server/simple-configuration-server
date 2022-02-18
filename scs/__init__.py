@@ -3,6 +3,8 @@
 Main entrypoint for the Simple Configuration Server
 """
 from pathlib import Path
+import yaml
+import os
 
 from flask import Flask
 
@@ -18,23 +20,33 @@ def create_app():
     # create and configure the app
     app = Flask(__name__)
 
-    app.jinja_options.update({
-        # Make sure if statements and for-loops do not add unnecessary new lines
-        'trim_blocks': True,
-        'lstrip_blocks': True,
-        # Keep traling newlines in configuration files
-        'keep_trailing_newline': True,
-    })
+    # Load the SCS application configuration
+    config_dir = Path(os.environ['SCS_CONFIG_DIR']).absolute()
+    if not config_dir.is_dir():
+        raise ValueError('The provided SCS_CONFIG_DIR does not exist!')
 
-    # Register blueprints
-    app.register_blueprint(audit.bp)
-    configs.init(
-        config_dir=Path(current_dir, '../data/config_example/config'),
-        common_dir=Path(current_dir, '../data/config_example/common'),
-        secrets_dir=Path(current_dir, '../data/config_example/secrets')
+    scs_conf_path = Path(config_dir, 'scs_conf.yaml')
+    scs_conf = load_app_config(scs_conf_path)
+
+    scs_auth_path = Path(config_dir, 'scs_auth.yaml')
+
+    # Register blueprints and pass configuration
+    app.register_blueprint(
+        audit.bp, **scs_conf['audit']
     )
-    app.register_blueprint(configs.bp)
-    auth.init()
-    app.register_blueprint(auth.bp)
+    app.register_blueprint(
+        configs.bp, **scs_conf['configs']
+    )
+    app.register_blueprint(
+        auth.bp, **{'scs_auth_path': scs_auth_path, **scs_conf['auth']},
+    )
 
     return app
+
+
+def load_app_config(path):
+    """
+    Load the scs_conf.yaml file
+    """
+    with open(path, 'r', encoding='utf8') as yamlfile:
+        return yaml.load(yamlfile, configs.SCSAppConfigLoader)

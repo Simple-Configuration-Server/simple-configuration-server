@@ -16,6 +16,7 @@ import copy
 from flask import (
     Blueprint, render_template, request, abort, g
 )
+from flask.blueprints import BlueprintSetupState
 
 bp = Blueprint('configs', __name__, url_prefix='/configs')
 
@@ -48,6 +49,62 @@ class _ParsedFileCache:
 
 
 filecache = _ParsedFileCache()
+
+
+@bp.record
+def init(setup_state: BlueprintSetupState):
+    """
+    Initializes the configs/* endpoints
+
+    Args:
+        setup_state:
+            The .options attribute of this (options passed to 
+            register_blueprint function) should contain the following dict
+            data:
+                directories: dict; containing:
+                    common, config, secrets: str
+
+
+    """
+    global config_basepath, common_basepath, secrets_basepath
+
+    # Load setup_state options
+    opts = setup_state.options
+    config_basepath = Path(opts['directories']['config']).absolute()
+    common_basepath = Path(opts['directories']['common']).absolute()
+    secrets_basepath = Path(opts['directories']['secrets']).absolute()
+
+    # Configure template rendering options
+    setup_state.app.jinja_options.update({
+        # Make sure if statements and for-loops do not add unnecessary new lines
+        'trim_blocks': True,
+        'lstrip_blocks': True,
+        # Keep traling newlines in configuration files
+        'keep_trailing_newline': True,
+    })
+
+    bp.template_folder = config_basepath
+
+    envs = get_config_envs()
+    filecache.clear()
+    for relative_url, envdata in envs.items():
+        bp.add_url_rule(
+            relative_url,
+            endpoint=relative_url.replace('.', '_'),
+            view_func=partial(
+                view_config_file,
+                path=relative_url,
+                envdata=envdata
+            ),
+            methods=['GET', 'POST'],
+        )
+
+        # Below doesn't work, since we cannot access the app. The proper
+        # Blueprint initialization mechanisms need to be used for this.
+        # testenv = copy.deepcopy(envdata)
+        # serialize_secrets(testenv)
+        # template = bp.jinja_env.get_template(relative_url.lstrip('/'))
+        # template.render(**testenv)
 
 
 class SCSSecret:
@@ -163,6 +220,13 @@ class SCSSecretsLoader(yaml.SafeLoader):
 
 
 SCSSecretsLoader.add_constructor('!scs-gen-secret', construct_secret)
+
+
+class SCSAppConfigLoader(yaml.SafeLoader):
+    pass
+
+
+SCSAppConfigLoader.add_constructor('!scs-expand-env', expand_env_vars)
 
 
 def load_yaml(path: os.PathLike, is_secrets_file=False) -> dict:
@@ -307,43 +371,3 @@ def view_config_file(path: str, envdata: dict):
         #     400,
         # )
         abort(400)
-
-
-def init(
-        *, config_dir: os.PathLike, common_dir: os.PathLike,
-        secrets_dir: os.PathLike
-        ):
-    """
-    This builds the URL structure of the configs/* endpoint, validates if all
-    references in YAML files can be built, does an initial parsing of the
-    config files to check the templating syntax, and initializes any secrets
-    in the files, with the !scs-gen-secret tag.
-    """
-    global config_basepath, common_basepath, secrets_basepath
-
-    config_basepath = Path(config_dir).absolute()
-    common_basepath = Path(common_dir).absolute()
-    secrets_basepath = Path(secrets_dir).absolute()
-
-    bp.template_folder = config_basepath
-
-    envs = get_config_envs()
-    filecache.clear()
-    for relative_url, envdata in envs.items():
-        bp.add_url_rule(
-            relative_url,
-            endpoint=relative_url.replace('.', '_'),
-            view_func=partial(
-                view_config_file,
-                path=relative_url,
-                envdata=envdata
-            ),
-            methods=['GET', 'POST'],
-        )
-
-        # Below doesn't work, since we cannot access the app. The proper
-        # Blueprint initialization mechanisms need to be used for this.
-        # testenv = copy.deepcopy(envdata)
-        # serialize_secrets(testenv)
-        # template = bp.jinja_env.get_template(relative_url.lstrip('/'))
-        # template.render(**testenv)

@@ -5,10 +5,13 @@ actions related to authentication and retrieving information. For all possible
 events, see the 'events' variable below.
 """
 import logging
+from logging import handlers
 import json
 import datetime
+from pathlib import Path
 
 from flask import Blueprint, g, request
+from flask.blueprints import BlueprintSetupState
 
 bp = Blueprint('audit', __name__)
 
@@ -42,6 +45,44 @@ events = {
 }
 
 
+@bp.record
+def init(setup_state: BlueprintSetupState):
+    """
+    Initialize the audit module logging
+
+    Args:
+        setup_state:
+            Should have a .options attribute (options passed to
+            register_blueprint function) containing a dict with
+            the following key/value pairs:
+                log: dict; containing:
+                    path: os.Pathlike
+                    max_size_mb: int
+                    backup_count: int
+    """
+    # Get the options
+    opts = setup_state.options
+    log_path = Path(opts['log']['path']).absolute()
+    log_max_size = opts['log']['max_size_mb'] * 1024 * 1024
+    log_backup_count = opts['log']['backup_count']
+
+    if not log_path.parent.is_dir():
+        raise ValueError(
+            'Invalid audit log path provided!'
+        )
+
+    # Apply the logging options
+    logger.setLevel('INFO')
+    handler = handlers.RotatingFileHandler(
+        filename=log_path,
+        maxBytes=log_max_size,
+        backupCount=log_backup_count
+    )
+    handler.setFormatter(AuditLogFormatter())
+    handler.setLevel('INFO')
+    logger.addHandler(handler)
+
+
 def add_audit_event(
         *, event_type: str, secrets: list[str] = None
         ):
@@ -67,7 +108,7 @@ def add_audit_event(
 @bp.before_app_request
 def init_events_function():
     """
-    Initializes the events for the g object
+    Initializes the events for the global object, and adds the function
     """
     g.audit_events = []
     g.add_audit_event = add_audit_event
@@ -112,10 +153,3 @@ class AuditLogFormatter(logging.Formatter):
         }
 
         return json.dumps(payload, ensure_ascii=False)
-
-
-# For testing, log to console
-logger.setLevel('INFO')
-handler = logging.StreamHandler()
-handler.setFormatter(AuditLogFormatter())
-logger.addHandler(handler)

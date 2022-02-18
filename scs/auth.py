@@ -8,12 +8,107 @@ import re
 import ipaddress
 
 from flask import Blueprint, request, abort, g
+from flask.blueprints import BlueprintSetupState
 
 from .configs import load_yaml, serialize_secrets
 
 bp = Blueprint('auth', __name__)
 
 current_dir = Path(__file__).absolute().parent
+
+
+@bp.record
+def init(setup_state: BlueprintSetupState):
+    """
+    Initializes the authentication module by loading the configuration files
+
+    Args:
+        setup_state:
+            The .options attribute (options parameter passed to
+            register_blueprint) should be a dict with the key/value pairs:
+                scs_auth_path: pathlib.Path
+                private_only: bool
+                ip_whitelist: list[str]
+    """
+    # TODO: Check functionality when using Ipv6 or mixed ipv4 and ipv6
+    global auth_mapping
+
+    # Get options
+    opts = setup_state.options
+    scs_auth_path = opts['scs_auth_path']
+    private_only = opts['private_only']
+    ip_whitelist = opts['ip_whitelist']
+
+    # Load the scs_auth.yaml file
+    scs_auth = load_yaml(scs_auth_path)
+    serialize_secrets(scs_auth)
+
+    # Parse whitelisted IP ranges:
+    parsed_global_whitelist = [
+        ipaddress.ip_network(ip_range) for ip_range in ip_whitelist
+    ]
+
+    # Check if these are all private
+    if private_only:
+        for network in parsed_global_whitelist:
+            if not network.is_private:
+                raise ValueError(
+                    'private_only enabled, but globally whitelisted '
+                    f'{str(network)} is not private!'
+                )
+
+    # Create the mapping
+    auth_mapping = {}
+    for account in scs_auth['accounts']:
+        auth_mapping[account.pop('token')] = account
+        # Parse the IP whitelist
+        if 'whitelist' in account:
+            parsed_whitelist = []
+            for item in account['whitelist']:
+                network = ipaddress.ip_network(item)
+                if not is_whitelisted(network, parsed_global_whitelist):
+                    raise ValueError(
+                        f"Network {str(network)} of account '{account['id']} "
+                        "is not globally whitelisted!"
+                    )
+                if private_only and not network.is_private:
+                    raise ValueError(
+                        f"Network {str(network)} of account '{account['id']} "
+                        "is not private, but private_only is enabled!"
+                    )
+                parsed_whitelist.append(network)
+            account['whitelist'] = parsed_whitelist
+        # Parse the path whitelist regexes
+        if 'allowed' in account:
+            parsed_allowed = []
+            for item in account['allowed']:
+                regex_str = '^' + re.escape(item).replace(r'\*', '(.*)') + '$'
+                parsed_allowed.append(
+                    re.compile(regex_str)
+                )
+            account['allowed'] = parsed_allowed
+
+
+def is_whitelisted(
+        network: ipaddress._BaseNetwork,
+        whitelist: list[ipaddress._BaseNetwork]
+        ) -> bool:
+    """
+    Checks if the network is in the given whitelist
+
+    Args:
+        network: The network to check
+        whitelist: The whitelist the network should be within
+
+    Returns:
+        Whether the given network is a subnet of any of the networks in the
+        whitelist
+    """
+    for wl_network in whitelist:
+        if network.subnet_of(wl_network):
+            return True
+    else:
+        return False
 
 
 @bp.before_app_request
@@ -33,11 +128,8 @@ def check_auth():
 
     # User is authenticated. Now check (1) if the ip is in the whitelist, (2)
     # if the url is authorized
-    user_ip = ipaddress.ip_address(request.remote_addr)
-    for network in user['whitelist']:
-        if user_ip in network:
-            break
-    else:
+    user_ip = ipaddress.ip_network(request.remote_addr)
+    if not is_whitelisted(user_ip, user['whitelist']):
         g.add_audit_event(event_type='unauthorized_ip')
         abort(403)
 
@@ -48,45 +140,3 @@ def check_auth():
     else:
         g.add_audit_event(event_type='unauthorized_path')
         abort(403)
-
-
-def init():
-    """
-    Initializes the authentication module by loading the configuration files
-
-    Args:
-        scs_auth_loc:
-            Location of the scs_auth.yaml file
-
-        secrets_dir:
-            The directory containing the secrets
-    """
-    # TODO: This should check at a later point if the given whitelist ips are
-    # private ips, depending on the 'private only' value
-    global auth_mapping
-
-    auth_data = load_yaml(
-        Path(current_dir, '../data/config_example/scs_auth.yaml')
-    )
-    serialize_secrets(auth_data)
-
-    # Create the mapping
-    auth_mapping = {}
-    for account in auth_data['accounts']:
-        auth_mapping[account.pop('token')] = account
-        # Parse the IP whitelist
-        if 'whitelist' in account:
-            parsed_whitelist = []
-            for item in account['whitelist']:
-                network = ipaddress.ip_network(item)
-                parsed_whitelist.append(network)
-            account['whitelist'] = parsed_whitelist
-        # Parse the path whitelist regexes
-        if 'allowed' in account:
-            parsed_allowed = []
-            for item in account['allowed']:
-                regex_str = '^' + re.escape(item).replace(r'\*', '(.*)') + '$'
-                parsed_allowed.append(
-                    re.compile(regex_str)
-                )
-            account['allowed'] = parsed_allowed
