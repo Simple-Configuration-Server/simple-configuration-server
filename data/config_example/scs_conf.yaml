@@ -10,6 +10,7 @@ configs:
     common: !scs-expand-env ${SCS_CONFIG_DIR}/common
     config: !scs-expand-env ${SCS_CONFIG_DIR}/config
     secrets: !scs-expand-env ${SCS_CONFIG_DIR}/secrets
+  template_check_during_init: true
 
 audit:
   log:

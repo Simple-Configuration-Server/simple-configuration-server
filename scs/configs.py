@@ -73,6 +73,7 @@ def init(setup_state: BlueprintSetupState):
     config_basepath = Path(opts['directories']['config']).absolute()
     common_basepath = Path(opts['directories']['common']).absolute()
     secrets_basepath = Path(opts['directories']['secrets']).absolute()
+    check_templates = opts['template_check_during_init']
 
     # Configure template rendering options
     setup_state.app.jinja_options.update({
@@ -99,12 +100,13 @@ def init(setup_state: BlueprintSetupState):
             methods=['GET', 'POST'],
         )
 
-        # Below doesn't work, since we cannot access the app. The proper
-        # Blueprint initialization mechanisms need to be used for this.
-        # testenv = copy.deepcopy(envdata)
-        # serialize_secrets(testenv)
-        # template = bp.jinja_env.get_template(relative_url.lstrip('/'))
-        # template.render(**testenv)
+        if check_templates:
+            testenv = copy.deepcopy(envdata)
+            serialize_secrets(testenv)
+            template = setup_state.app.jinja_env.get_template(
+                relative_url.lstrip('/')
+            )
+            template.render(**testenv)
 
 
 class SCSSecret:
