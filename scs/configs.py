@@ -3,7 +3,6 @@
 Flask Blueprint containing the code for the configs/ endpoints, that loads the
 configuration data and returns the formatted data
 """
-import argparse
 from pathlib import Path
 import re
 import secrets
@@ -148,12 +147,13 @@ def construct_scs_ref(loader, node):
     else:
         file_path = Path(loader.filepath.absolute().parent, file_path)
 
-    file_data = load_yaml(file_path, is_secrets_file=is_secrets_file)
+    file_data = load_yaml(
+        file_path, is_secrets_file=is_secrets_file, is_referenced=True
+    )
 
     if not attribute_loc:
         ref_data = file_data
     else:
-        # TODO: How to support dots in variable names?
         loc_levels = attribute_loc.split('.')
         level_data = file_data
         for level in loc_levels:
@@ -231,28 +231,76 @@ class SCSAppConfigLoader(yaml.SafeLoader):
 SCSAppConfigLoader.add_constructor('!scs-expand-env', expand_env_vars)
 
 
-def load_yaml(path: os.PathLike, is_secrets_file=False) -> dict:
+def contains_keys_with_dots(data):
+    """
+    Verify that there are no dots in the keynames of dicts embedded in the data
+
+    Raises:
+        KeyError in case keynames contain dots
+    """
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if '.' in key:
+                return True
+            if contains_keys_with_dots(value):
+                return True
+    elif isinstance(data, list):
+        for item in data:
+            if contains_keys_with_dots(item):
+                return True
+
+    return False
+
+
+def load_yaml(
+        path: os.PathLike, is_secrets_file: bool = False,
+        is_referenced: bool = False,
+        ) -> dict:
     """
     Load the YAML file from the given directory id
+
+    Args:
+        path:
+            The path of the file to load
+        is_secrets_file:
+            When set to True, the file is loaded using the Secrets loader,
+            and secrets are generated if they contain a !scs-gen-secret tag
+        is_referenced:
+            In case the file that is loaded, is referenced from another file,
+            an additional check is performed if key names do not contain dots,
+            since this is not compatible with the reference format
+
+    Returns:
+        The loaded data
+
+    Raises:
+        KeyError in case a file is_referenced, and any of the key names
+        contains dots
     """
     # Try to load from cache
     if (filedata := filecache.get_file(path)) is not None:
         data = filedata
-        return data
+    else:
+        with open(path, 'r', encoding='utf8') as yamlfile:
+            if is_secrets_file:
+                loader = SCSSecretsLoader(yamlfile)
+            else:
+                loader = SCSConfigLoader(yamlfile, filepath=path)
 
-    with open(path, 'r', encoding='utf8') as yamlfile:
-        if is_secrets_file:
-            loader = SCSSecretsLoader(yamlfile)
-        else:
-            loader = SCSConfigLoader(yamlfile, filepath=path)
+            data = loader.get_single_data()
 
-        data = loader.get_single_data()
+            filecache.add_file(path, data)
 
-        filecache.add_file(path, data)
+        if is_secrets_file and loader.contents_changed:
+            with open(path, 'w', encoding='utf8') as yamlfile:
+                yaml.dump(data, yamlfile, sort_keys=False)
 
-    if is_secrets_file and loader.contents_changed:
-        with open(path, 'w', encoding='utf8') as yamlfile:
-            yaml.dump(data, yamlfile, sort_keys=False)
+    if is_referenced and contains_keys_with_dots(data):
+        raise KeyError(
+            f'The File {Path(path).as_posix()} contains key names with '
+            'dots, which is incompatible with the reference format used in '
+            '!scs tags'
+        )
 
     return data
 
