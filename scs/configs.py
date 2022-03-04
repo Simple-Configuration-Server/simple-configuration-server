@@ -4,10 +4,9 @@ Flask Blueprint containing the code for the configs/ endpoints, that loads the
 configuration data and returns the formatted data
 """
 from pathlib import Path
-import re
-import os
 from functools import partial
 import copy
+import importlib
 
 from flask import (
     Blueprint, render_template, request, abort, g
@@ -22,6 +21,7 @@ bp = Blueprint('configs', __name__, url_prefix='/configs')
 file_folder = Path(__file__).absolute().parent
 url_structure = {}
 
+
 @bp.record
 def init(setup_state: BlueprintSetupState):
     """
@@ -29,7 +29,7 @@ def init(setup_state: BlueprintSetupState):
 
     Args:
         setup_state:
-            The .options attribute of this (options passed to 
+            The .options attribute of this (options passed to
             register_blueprint function) should contain the following dict
             data:
                 directories: dict; containing:
@@ -44,16 +44,18 @@ def init(setup_state: BlueprintSetupState):
     config_basepath = Path(opts['directories']['config']).absolute()
     common_basepath = Path(opts['directories']['common']).absolute()
     secrets_basepath = Path(opts['directories']['secrets']).absolute()
+    add_constructors = opts['add_constructors']
     check_templates = opts['template_check_during_init']
 
     _initialize_yaml_loaders(
         common_dir=common_basepath,
-        secrets_dir=secrets_basepath
+        secrets_dir=secrets_basepath,
+        add_constructors=add_constructors
     )
 
     # Configure template rendering options
     setup_state.app.jinja_options.update({
-        # Make sure if statements and for-loops do not add unnecessary new lines
+        # Make sure if statements and for-loops do not add unnecessary newlines
         'trim_blocks': True,
         'lstrip_blocks': True,
         # Keep traling newlines in configuration files
@@ -64,8 +66,10 @@ def init(setup_state: BlueprintSetupState):
 
     envs = get_config_envs()
     for relative_url, envdata in envs.items():
+        print(relative_url)
         bp.add_url_rule(
             relative_url,
+            # Endpoint name must be unique, but  may not contain a dot
             endpoint=relative_url.replace('.', '_'),
             view_func=partial(
                 view_config_file,
@@ -84,7 +88,22 @@ def init(setup_state: BlueprintSetupState):
             template.render(**testenv)
 
 
-def _initialize_yaml_loaders(*, common_dir: Path, secrets_dir: Path):
+def get_constructor_class(full_ref: str) -> yaml.SCSYamlTagConstructor:
+    """
+    Gets the constructor class from a string that includes the full path (
+    prefixed with packages/modules)
+    """
+    path_components = full_ref.split('.')
+    module_ref = '.'.join(path_components[:-1])
+    classname = path_components[-1]
+
+    module = importlib.import_module(module_ref)
+    return getattr(module, classname)
+
+
+def _initialize_yaml_loaders(
+        *, common_dir: Path, secrets_dir: Path, add_constructors: list[dict]
+        ):
     """
     Initialize the loader with the right constructors
     """
@@ -94,6 +113,16 @@ def _initialize_yaml_loaders(*, common_dir: Path, secrets_dir: Path):
         yaml.SCSCommonConstructor(common_dir=common_dir),
         yaml.SCSExpandEnvConstructor(),
     ]
+
+    if add_constructors:
+        for constructor_config in add_constructors:
+            constructor_class = get_constructor_class(
+                constructor_config['class']
+            )
+            options = constructor_config.get('options', {})
+            ENV_FILE_CONSTRUCTORS.append(
+                constructor_class(**options)
+            )
 
     SECRET_FILE_CONSTRUCTORS = [
         yaml.SCSGenSecretConstructor(),

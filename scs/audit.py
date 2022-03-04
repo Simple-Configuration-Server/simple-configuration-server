@@ -62,9 +62,9 @@ def init(setup_state: BlueprintSetupState):
     """
     # Get the options
     opts = setup_state.options
-    log_path = Path(opts['log']['path']).absolute()
-    log_max_size = opts['log']['max_size_mb'] * 1024 * 1024
-    log_backup_count = opts['log']['backup_count']
+    log_path = Path(opts['path']).absolute()
+    log_max_size = opts['max_size_mb'] * 1024 * 1024
+    log_backup_count = opts['backup_count']
 
     if not log_path.parent.is_dir():
         raise ValueError(

@@ -44,7 +44,7 @@ def init(setup_state: BlueprintSetupState):
 
     # Get options
     opts = setup_state.options
-    scs_auth_path = opts['scs_auth_path']
+    scs_auth_path = Path(opts['SCS_CONFIG_DIR'], 'scs_auth.yaml')
     private_only = opts['private_only']
     ip_whitelist = opts['ip_whitelist']
     secrets_dir = opts['secrets_dir']

@@ -4,6 +4,7 @@ Main entrypoint for the Simple Configuration Server
 """
 from pathlib import Path
 import os
+import importlib
 
 from flask import Flask
 
@@ -27,20 +28,21 @@ def create_app():
     scs_conf_path = Path(config_dir, 'scs_conf.yaml')
     scs_conf = load_app_config(scs_conf_path)
 
-    scs_auth_path = Path(config_dir, 'scs_auth.yaml')
-
     # Register blueprints and pass configuration
     app.register_blueprint(
-        audit.bp, **scs_conf['audit']
+        audit.bp, **scs_conf['core']['audit_log']
     )
     app.register_blueprint(
-        configs.bp, **scs_conf['configs']
+        configs.bp,
+        add_constructors=scs_conf.get('add_constructors', []),
+        **scs_conf['core'],
     )
+
+    auth_module = importlib.import_module(scs_conf['auth']['module'])
     app.register_blueprint(
-        auth.bp,
-        scs_auth_path=scs_auth_path,
-        secrets_dir=scs_conf['configs']['directories']['secrets'],
-        **scs_conf['auth'],
+        auth_module.bp,
+        SCS_CONFIG_DIR=config_dir,
+        **scs_conf['auth']['options'],
     )
 
     # Clear the cache that was used to load all files
