@@ -3,12 +3,11 @@
 Main entrypoint for the Simple Configuration Server
 """
 from pathlib import Path
-import yaml
 import os
 
 from flask import Flask
 
-from . import configs, auth, audit
+from . import configs, auth, audit, yaml
 
 current_dir = Path(__file__).absolute().parent
 
@@ -38,15 +37,31 @@ def create_app():
         configs.bp, **scs_conf['configs']
     )
     app.register_blueprint(
-        auth.bp, **{'scs_auth_path': scs_auth_path, **scs_conf['auth']},
+        auth.bp,
+        scs_auth_path=scs_auth_path,
+        secrets_dir=scs_conf['configs']['directories']['secrets'],
+        **scs_conf['auth'],
     )
+
+    # Clear the cache that was used to load all files
+    yaml.filecache.clear()
 
     return app
 
 
-def load_app_config(path):
+def load_app_config(path: Path) -> dict:
     """
-    Load the scs_conf.yaml file
+    Loads the main SCS config file
+
+    Args:
+        path: The path to the configuration file
+
+    Returns:
+        The configuration file data
     """
-    with open(path, 'r', encoding='utf8') as yamlfile:
-        return yaml.load(yamlfile, configs.SCSAppConfigLoader)
+    # Add constructors to the loader, and load the file
+    expand_env_constructor = yaml.SCSExpandEnvConstructor()
+    yaml.SCSAppConfigLoader.add_constructor(
+        expand_env_constructor.tag, expand_env_constructor.construct
+    )
+    return yaml.load(path, yaml.SCSAppConfigLoader)

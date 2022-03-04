@@ -10,11 +10,20 @@ import ipaddress
 from flask import Blueprint, request, abort, g
 from flask.blueprints import BlueprintSetupState
 
-from .configs import load_yaml, serialize_secrets
+from .configs import serialize_secrets
+from . import yaml
+
 
 bp = Blueprint('auth', __name__)
 
 current_dir = Path(__file__).absolute().parent
+
+
+class SCSAuthFileLoader(yaml.SCSYamlLoader):
+    """
+    Loader for the auth configuration file
+    """
+    pass
 
 
 @bp.record
@@ -38,9 +47,14 @@ def init(setup_state: BlueprintSetupState):
     scs_auth_path = opts['scs_auth_path']
     private_only = opts['private_only']
     ip_whitelist = opts['ip_whitelist']
+    secrets_dir = opts['secrets_dir']
 
     # Load the scs_auth.yaml file
-    scs_auth = load_yaml(scs_auth_path)
+    secrets_constructor = yaml.SCSSecretConstructor(secrets_dir=secrets_dir)
+    SCSAuthFileLoader.add_constructor(
+        secrets_constructor.tag, secrets_constructor.construct
+    )
+    scs_auth = yaml.load(scs_auth_path, loader=SCSAuthFileLoader)
     serialize_secrets(scs_auth)
 
     # Parse whitelisted IP ranges:

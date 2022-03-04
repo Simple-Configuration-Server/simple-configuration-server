@@ -5,11 +5,8 @@ configuration data and returns the formatted data
 """
 from pathlib import Path
 import re
-import secrets
 import os
 from functools import partial
-
-import yaml
 import copy
 
 from flask import (
@@ -17,38 +14,13 @@ from flask import (
 )
 from flask.blueprints import BlueprintSetupState
 
+from . import yaml
+
 bp = Blueprint('configs', __name__, url_prefix='/configs')
 
 # Configure ninja2
 file_folder = Path(__file__).absolute().parent
 url_structure = {}
-
-index_regex = re.compile(r'\[(\d+)\]')
-env_variable_pattern = re.compile(r'\$\{([^}^{]+)\}')
-
-
-class _ParsedFileCache:
-    """
-    Object to store the parsed contents of a YAML file during the construction
-    of envdata for each path
-    """
-    def __init__(self):
-        self.cache = {}
-
-    def clear(self):
-        self.cache = {}
-
-    def get_file(self, path: os.PathLike):
-        abspath = Path(path).absolute().as_posix()
-        return self.cache.get(abspath)
-
-    def add_file(self, path: os.PathLike, data):
-        abspath = Path(path).absolute().as_posix()
-        self.cache[abspath] = data
-
-
-filecache = _ParsedFileCache()
-
 
 @bp.record
 def init(setup_state: BlueprintSetupState):
@@ -74,6 +46,11 @@ def init(setup_state: BlueprintSetupState):
     secrets_basepath = Path(opts['directories']['secrets']).absolute()
     check_templates = opts['template_check_during_init']
 
+    _initialize_yaml_loaders(
+        common_dir=common_basepath,
+        secrets_dir=secrets_basepath
+    )
+
     # Configure template rendering options
     setup_state.app.jinja_options.update({
         # Make sure if statements and for-loops do not add unnecessary new lines
@@ -86,7 +63,6 @@ def init(setup_state: BlueprintSetupState):
     bp.template_folder = config_basepath
 
     envs = get_config_envs()
-    filecache.clear()
     for relative_url, envdata in envs.items():
         bp.add_url_rule(
             relative_url,
@@ -108,127 +84,30 @@ def init(setup_state: BlueprintSetupState):
             template.render(**testenv)
 
 
-class SCSSecret:
+def _initialize_yaml_loaders(*, common_dir: Path, secrets_dir: Path):
     """
-    A secret class, used to track which secrets end-up in the final Env, so
-    secret access can be logged.
-
-    Attributes:
-        id:
-            A unique identifier describing the secrets. This will be logged in
-            the access logs
-        value:
-            The value of the secret
+    Initialize the loader with the right constructors
     """
-    def __init__(self, id_: str, value):
-        self.id = id_
-        self.value = value
+    ENV_FILE_CONSTRUCTORS = [
+        yaml.SCSRelativeConstructor(),
+        yaml.SCSSecretConstructor(secrets_dir=secrets_dir),
+        yaml.SCSCommonConstructor(common_dir=common_dir),
+        yaml.SCSExpandEnvConstructor(),
+    ]
 
+    SECRET_FILE_CONSTRUCTORS = [
+        yaml.SCSGenSecretConstructor(),
+    ]
 
-def construct_scs_ref(loader, node):
-    """PyYaml constructor for scs-ref tags"""
-    ref = node.value
+    for constructor in ENV_FILE_CONSTRUCTORS:
+        yaml.SCSEnvFileLoader.add_constructor(
+            constructor.tag, constructor.construct
+        )
 
-    ref_parts = ref.split('#')
-
-    if len(ref_parts) == 1:
-        file_path = ref_parts
-        attribute_loc = None
-    else:
-        file_path, attribute_loc = ref_parts
-
-    # Resolve full path
-    is_secrets_file = False
-    if node.tag == '!scs-secret':
-        file_path = Path(secrets_basepath, file_path)
-        is_secrets_file = True
-    elif node.tag == '!scs-common':
-        file_path = Path(common_basepath, file_path)
-    else:
-        file_path = Path(loader.filepath.absolute().parent, file_path)
-
-    file_data = load_yaml(
-        file_path, is_secrets_file=is_secrets_file, is_referenced=True
-    )
-
-    if not attribute_loc:
-        ref_data = file_data
-    else:
-        loc_levels = attribute_loc.split('.')
-        level_data = file_data
-        for level in loc_levels:
-            if match := index_regex.match(level):
-                index = int(match.group(1))
-                level_data = level_data[index]
-            else:
-                level_data = level_data[level]
-        ref_data = level_data
-
-    if is_secrets_file and not isinstance(ref_data, SCSSecret):
-        ref_data = SCSSecret(ref, ref_data)
-
-    return ref_data
-
-
-def construct_secret(loader, node):
-    """
-    Constructs a random secret for a node, using the secrets.token_urlsafe
-    function
-    """
-    loader.contents_changed = True
-
-    return secrets.token_urlsafe(32)
-
-
-def get_env_var(match):
-    """
-    Return the environment variable for the 'env_variable_pattern' match
-    """
-    env_var_name = match.group(1)
-    try:
-        return os.environ[env_var_name]
-    except KeyError:
-        raise KeyError(f'Environment Variable {env_var_name} not defined!')\
-            from None
-
-
-def expand_env_vars(loader, node):
-    """
-    Constructs a random secret for a node, using the secrets.token_urlsafe
-    function
-    """
-    return env_variable_pattern.sub(get_env_var, node.value)
-
-
-class SCSConfigLoader(yaml.SafeLoader):
-    def __init__(self, *args, filepath: os.PathLike = None, **kwargs):
-        # Filepath is required for relative loading,
-        # and the loaded secrets need to be tracked
-        self.filepath = filepath
-        self.contents_changed = False
-        super().__init__(*args, **kwargs)
-
-
-SCSConfigLoader.add_constructor('!scs-relative', construct_scs_ref)
-SCSConfigLoader.add_constructor('!scs-secret', construct_scs_ref)
-SCSConfigLoader.add_constructor('!scs-common', construct_scs_ref)
-SCSConfigLoader.add_constructor('!scs-expand-env', expand_env_vars)
-
-
-class SCSSecretsLoader(yaml.SafeLoader):
-    def __init__(self, *args, **kwargs):
-        self.contents_changed = False
-        super().__init__(*args, **kwargs)
-
-
-SCSSecretsLoader.add_constructor('!scs-gen-secret', construct_secret)
-
-
-class SCSAppConfigLoader(yaml.SafeLoader):
-    pass
-
-
-SCSAppConfigLoader.add_constructor('!scs-expand-env', expand_env_vars)
+    for constructor in SECRET_FILE_CONSTRUCTORS:
+        yaml.SCSSecretFileLoader.add_constructor(
+            constructor.tag, constructor.construct
+        )
 
 
 def contains_keys_with_dots(data):
@@ -252,59 +131,6 @@ def contains_keys_with_dots(data):
     return False
 
 
-def load_yaml(
-        path: os.PathLike, is_secrets_file: bool = False,
-        is_referenced: bool = False,
-        ) -> dict:
-    """
-    Load the YAML file from the given directory id
-
-    Args:
-        path:
-            The path of the file to load
-        is_secrets_file:
-            When set to True, the file is loaded using the Secrets loader,
-            and secrets are generated if they contain a !scs-gen-secret tag
-        is_referenced:
-            In case the file that is loaded, is referenced from another file,
-            an additional check is performed if key names do not contain dots,
-            since this is not compatible with the reference format
-
-    Returns:
-        The loaded data
-
-    Raises:
-        KeyError in case a file is_referenced, and any of the key names
-        contains dots
-    """
-    # Try to load from cache
-    if (filedata := filecache.get_file(path)) is not None:
-        data = filedata
-    else:
-        with open(path, 'r', encoding='utf8') as yamlfile:
-            if is_secrets_file:
-                loader = SCSSecretsLoader(yamlfile)
-            else:
-                loader = SCSConfigLoader(yamlfile, filepath=path)
-
-            data = loader.get_single_data()
-
-            filecache.add_file(path, data)
-
-        if is_secrets_file and loader.contents_changed:
-            with open(path, 'w', encoding='utf8') as yamlfile:
-                yaml.dump(data, yamlfile, sort_keys=False)
-
-    if is_referenced and contains_keys_with_dots(data):
-        raise KeyError(
-            f'The File {Path(path).as_posix()} contains key names with '
-            'dots, which is incompatible with the reference format used in '
-            '!scs tags'
-        )
-
-    return data
-
-
 def load_env_file(relative_path: str) -> dict:
     """
     Load the data from the given env file, if it exists
@@ -313,7 +139,7 @@ def load_env_file(relative_path: str) -> dict:
     if not path.is_file():
         return {}
 
-    return load_yaml(path)
+    return yaml.load(path, loader=yaml.SCSEnvFileLoader)
 
 
 def get_env_file_hierarchy(relative_path: str) -> list[str]:
@@ -345,7 +171,7 @@ def serialize_secrets(data: dict | list) -> list[str]:
     secret_ids = set()
     if isinstance(data, list):
         for i, item in enumerate(data):
-            if isinstance(item, SCSSecret):
+            if isinstance(item, yaml.SCSSecret):
                 secret_ids.add(item.id)
                 data[i] = item.value
             else:
@@ -355,7 +181,7 @@ def serialize_secrets(data: dict | list) -> list[str]:
             if isinstance(value, (dict, list)):
                 serialized_secrets = serialize_secrets(value)
                 secret_ids.update(serialized_secrets)
-            elif isinstance(value, SCSSecret):
+            elif isinstance(value, yaml.SCSSecret):
                 secret_ids.add(value.id)
                 data[key] = value.value
 
@@ -416,8 +242,4 @@ def view_config_file(path: str, envdata: dict):
             )
         return response
     except Exception:
-        # return (
-        #     "Error Parsing Config Template, Please check request body",
-        #     400,
-        # )
         abort(400)
