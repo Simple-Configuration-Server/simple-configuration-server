@@ -37,8 +37,6 @@ def init(setup_state: BlueprintSetupState):
 
 
     """
-    # TODO: Allow runtime loading of env-files, e.g. when constructors
-    # must be evaluated for each request
     global config_basepath, common_basepath, secrets_basepath
 
     # Load setup_state options

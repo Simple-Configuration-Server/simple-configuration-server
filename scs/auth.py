@@ -39,7 +39,6 @@ def init(setup_state: BlueprintSetupState):
                 private_only: bool
                 ip_whitelist: list[str]
     """
-    # TODO: Check functionality when using Ipv6 or mixed ipv4 and ipv6
     global auth_mapping
 
     # Get options
