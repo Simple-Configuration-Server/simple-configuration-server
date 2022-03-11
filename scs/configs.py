@@ -263,13 +263,11 @@ def view_config_file(path: str, envdata: dict):
     if request.method == 'POST':
         env.update(request.get_json(force=True))
     secret_ids = serialize_secrets(env)
-    try:
-        response = render_template(path.lstrip('/'), **env)
-        g.add_audit_event(event_type='config_loaded')
-        if secret_ids:
-            g.add_audit_event(
-                event_type='secrets_loaded', secrets=list(secret_ids),
-            )
-        return response
-    except Exception:
-        abort(400)
+
+    response = render_template(path.lstrip('/'), **env)
+    g.add_audit_event(event_type='config_loaded')
+    if secret_ids:
+        g.add_audit_event(
+            event_type='secrets_loaded', secrets=list(secret_ids),
+        )
+    return response

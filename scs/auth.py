@@ -148,13 +148,15 @@ def check_auth():
     # if the url is authorized
     user_ip = ipaddress.ip_network(request.remote_addr)
     if not is_whitelisted(user_ip, user['whitelist']):
-        g.add_audit_event(event_type='unauthorized_ip')
-        abort(403)
+        event_type = 'unauthorized_ip'
+        g.add_audit_event(event_type=event_type)
+        abort(403, description={'id': event_type})
 
     # Check if the user is allowed to access the provided url
     for pattern in user['allowed']:
         if pattern.match(request.path):
             break
     else:
-        g.add_audit_event(event_type='unauthorized_path')
-        abort(403)
+        event_type = 'unauthorized_path'
+        g.add_audit_event(event_type=event_type)
+        abort(403, description={'id': event_type})

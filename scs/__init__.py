@@ -8,7 +8,7 @@ import importlib
 
 from flask import Flask
 
-from . import configs, audit, yaml
+from . import configs, audit, yaml, errorhandlers
 
 current_dir = Path(__file__).absolute().parent
 
@@ -35,6 +35,7 @@ def create_app():
     app.register_blueprint(
         audit.bp, **scs_conf['core']['audit_log']
     )
+    app.register_blueprint(errorhandlers.bp)
     app.register_blueprint(
         configs.bp,
         add_constructors=scs_conf.get('add_constructors', []),
