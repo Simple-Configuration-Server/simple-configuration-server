@@ -122,8 +122,9 @@ def is_whitelisted(
         Whether the given network is a subnet of any of the networks in the
         whitelist
     """
+    network_type = type(network)  # Ipv4 or Ipv6 network
     for wl_network in whitelist:
-        if network.subnet_of(wl_network):
+        if network_type is type(wl_network) and network.subnet_of(wl_network):
             return True
     else:
         return False
