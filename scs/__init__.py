@@ -8,7 +8,7 @@ import importlib
 
 from flask import Flask
 
-from . import configs, auth, audit, yaml
+from . import configs, audit, yaml
 
 current_dir = Path(__file__).absolute().parent
 
@@ -42,6 +42,7 @@ def create_app():
     app.register_blueprint(
         auth_module.bp,
         SCS_CONFIG_DIR=config_dir,
+        reject_keys_with_dots=scs_conf['core']['reject_keys_with_dots'],
         **scs_conf['auth']['options'],
     )
 

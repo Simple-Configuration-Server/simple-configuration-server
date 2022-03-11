@@ -48,9 +48,13 @@ def init(setup_state: BlueprintSetupState):
     private_only = opts['private_only']
     ip_whitelist = opts['ip_whitelist']
     secrets_dir = opts['secrets_dir']
+    validate_dots = opts['reject_keys_with_dots']
 
     # Load the scs_auth.yaml file
-    secrets_constructor = yaml.SCSSecretConstructor(secrets_dir=secrets_dir)
+    secrets_constructor = yaml.SCSSecretConstructor(
+        secrets_dir=secrets_dir,
+        validate_dots=validate_dots
+    )
     SCSAuthFileLoader.add_constructor(
         secrets_constructor.tag, secrets_constructor.construct
     )

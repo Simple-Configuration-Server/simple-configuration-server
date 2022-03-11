@@ -37,6 +37,8 @@ def init(setup_state: BlueprintSetupState):
 
 
     """
+    # TODO: Allow runtime loading of env-files, e.g. when constructors
+    # must be evaluated for each request
     global config_basepath, common_basepath, secrets_basepath
 
     # Load setup_state options
@@ -46,11 +48,13 @@ def init(setup_state: BlueprintSetupState):
     secrets_basepath = Path(opts['directories']['secrets']).absolute()
     add_constructors = opts['add_constructors']
     check_templates = opts['template_check_during_init']
+    validate_dots = opts['reject_keys_with_dots']
 
     _initialize_yaml_loaders(
         common_dir=common_basepath,
         secrets_dir=secrets_basepath,
-        add_constructors=add_constructors
+        add_constructors=add_constructors,
+        validate_dots=validate_dots
     )
 
     # Configure template rendering options
@@ -66,7 +70,6 @@ def init(setup_state: BlueprintSetupState):
 
     envs = get_config_envs()
     for relative_url, envdata in envs.items():
-        print(relative_url)
         bp.add_url_rule(
             relative_url,
             # Endpoint name must be unique, but  may not contain a dot
@@ -102,15 +105,33 @@ def get_constructor_class(full_ref: str) -> yaml.SCSYamlTagConstructor:
 
 
 def _initialize_yaml_loaders(
-        *, common_dir: Path, secrets_dir: Path, add_constructors: list[dict]
+        *, common_dir: Path, secrets_dir: Path, add_constructors: list[dict],
+        validate_dots: bool,
         ):
     """
     Initialize the loader with the right constructors
+
+    Args:
+        common_dir: The base directory used to resolve !scs-common tags
+
+        secrets_dir: The base directory used to resolve !scs-secret tags
+
+        add_constructors: List of custom constructers to add
+
+        validate_dots: Whether errors should be generated if dots are in keys
     """
     ENV_FILE_CONSTRUCTORS = [
-        yaml.SCSRelativeConstructor(),
-        yaml.SCSSecretConstructor(secrets_dir=secrets_dir),
-        yaml.SCSCommonConstructor(common_dir=common_dir),
+        yaml.SCSRelativeConstructor(
+            validate_dots=validate_dots,
+        ),
+        yaml.SCSSecretConstructor(
+            secrets_dir=secrets_dir,
+            validate_dots=validate_dots,
+        ),
+        yaml.SCSCommonConstructor(
+            common_dir=common_dir,
+            validate_dots=validate_dots,
+        ),
         yaml.SCSExpandEnvConstructor(),
     ]
 
@@ -137,27 +158,6 @@ def _initialize_yaml_loaders(
         yaml.SCSSecretFileLoader.add_constructor(
             constructor.tag, constructor.construct
         )
-
-
-def contains_keys_with_dots(data):
-    """
-    Verify that there are no dots in the keynames of dicts embedded in the data
-
-    Raises:
-        KeyError in case keynames contain dots
-    """
-    if isinstance(data, dict):
-        for key, value in data.items():
-            if '.' in key:
-                return True
-            if contains_keys_with_dots(value):
-                return True
-    elif isinstance(data, list):
-        for item in data:
-            if contains_keys_with_dots(item):
-                return True
-
-    return False
 
 
 def load_env_file(relative_path: str) -> dict:

@@ -108,12 +108,21 @@ def load(path: Path, loader: SCSYamlLoader) -> Any:
 class RelativePathMixin:
     """
     Constructor Mixin to get the data from a referenced relative path
+
+    Attributes:
+        validate_dots:
+            Whether to validate that there are no dots in the key names, since
+            these are unusable for references
     """
     @property
     @abstractmethod
     def loader(self):
         """The Loader Class (NOT: instance) to use"""
         pass
+
+    def __init__(self, *args, validate_dots: bool = True, **kwargs):
+        self.validate_dots = validate_dots
+        super().__init__(*args, **kwargs)
 
     def _get_data(self, base_dir: Path, ref: str) -> Any:
         # Split the reference to (1) file path, (2) a property in a file (when
@@ -131,6 +140,11 @@ class RelativePathMixin:
 
         file_data = load(file_path, loader=self.loader)
 
+        if self.validate_dots and self._contains_keys_with_dots(file_data):
+            raise ValueError(
+                f'The file {file_path.as_posix()} has variable names with dots'
+            )
+
         if not attribute_loc:
             ref_data = file_data
         else:
@@ -145,6 +159,30 @@ class RelativePathMixin:
             ref_data = level_data
 
         return ref_data
+
+    def _contains_keys_with_dots(self, data: Any) -> bool:
+        """
+        Verify that there are no dots in the keynames of dicts embedded in the
+        data, since this doesn't work in combination with references
+
+        Arguments:
+            data: The data to validate
+
+        Returns:
+            Whether there are any 'keys' in the data that contain dots
+        """
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if '.' in key:
+                    return True
+                if self._contains_keys_with_dots(value):
+                    return True
+        elif isinstance(data, list):
+            for item in data:
+                if self._contains_keys_with_dots(item):
+                    return True
+
+        return False
 
 
 class SCSSecret:
@@ -172,8 +210,9 @@ class SCSSecretConstructor(SCSYamlTagConstructor, RelativePathMixin):
     tag = '!scs-secret'
     loader = SCSSecretFileLoader
 
-    def __init__(self, *, secrets_dir: Path):
+    def __init__(self, *args, secrets_dir: Path, **kwargs):
         self.secrets_dir = secrets_dir
+        super().__init__(*args, **kwargs)
 
     def construct(self, loader: Loader, node: Node) -> Any:
         ref = node.value
@@ -190,8 +229,9 @@ class SCSCommonConstructor(SCSYamlTagConstructor, RelativePathMixin):
     tag = '!scs-common'
     loader = SCSEnvFileLoader
 
-    def __init__(self, *, common_dir: Path):
+    def __init__(self, *args, common_dir: Path, **kwargs):
         self.common_dir = common_dir
+        super().__init__(*args, **kwargs)
 
     def construct(self, loader: Loader, node: Node) -> Any:
         ref = node.value
