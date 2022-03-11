@@ -22,17 +22,23 @@ class _ParsedFileCache:
     """
     def __init__(self):
         self.cache = {}
+        self.disabled = False
 
     def clear(self):
         self.cache = {}
 
     def get_file(self, path: os.PathLike):
-        abspath = Path(path).absolute().as_posix()
-        return self.cache.get(abspath)
+        if not self.disabled:
+            abspath = Path(path).absolute().as_posix()
+            return self.cache.get(abspath)
 
     def add_file(self, path: os.PathLike, data):
-        abspath = Path(path).absolute().as_posix()
-        self.cache[abspath] = data
+        if not self.disabled:
+            abspath = Path(path).absolute().as_posix()
+            self.cache[abspath] = data
+
+    def disable(self):
+        self.disabled = True
 
 
 filecache = _ParsedFileCache()

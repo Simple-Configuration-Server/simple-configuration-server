@@ -49,6 +49,7 @@ def init(setup_state: BlueprintSetupState):
     add_constructors = opts['add_constructors']
     check_templates = opts['template_check_during_init']
     validate_dots = opts['reject_keys_with_dots']
+    load_on_demand = opts['load_env_on_demand']
 
     _initialize_yaml_loaders(
         common_dir=common_basepath,
@@ -68,8 +69,13 @@ def init(setup_state: BlueprintSetupState):
 
     bp.template_folder = config_basepath
 
-    envs = get_config_envs()
-    for relative_url, envdata in envs.items():
+    relative_config_template_paths = get_relative_config_template_paths()
+    for relative_url in relative_config_template_paths:
+        if load_on_demand:
+            envdata = None
+        else:
+            envdata = load_env(relative_url.lstrip('/'))
+
         bp.add_url_rule(
             relative_url,
             # Endpoint name must be unique, but  may not contain a dot
@@ -82,7 +88,7 @@ def init(setup_state: BlueprintSetupState):
             methods=['GET', 'POST'],
         )
 
-        if check_templates:
+        if check_templates and not load_on_demand:
             testenv = copy.deepcopy(envdata)
             serialize_secrets(testenv)
             template = setup_state.app.jinja_env.get_template(
@@ -231,34 +237,29 @@ def load_env(relative_path):
     return combined_env
 
 
-def get_config_envs():
+def get_relative_config_template_paths() -> list[str]:
     """
-    Creates a dict with all config file paths, and the env data of each path
+    Get the relative paths of all config templates
     """
-    # 1. Load all paths
     config_template_paths = []
     for path in config_basepath.rglob('*'):
         if path.is_file() and not path.name.endswith('scs-env.yaml'):
-            config_template_paths.append(path)
+            relative_template_path = \
+                path.as_posix().removeprefix(config_basepath.as_posix())
+            config_template_paths.append(relative_template_path)
 
-    # 2. Load env for each path
-    config_envs = {}
-    for path in config_template_paths:
-        relative_template_path = \
-            path.as_posix().removeprefix(config_basepath.as_posix())
-
-        config_envs[relative_template_path] = load_env(
-            relative_template_path.lstrip('/')
-        )
-
-    return config_envs
+    return config_template_paths
 
 
 def view_config_file(path: str, envdata: dict):
     """
     Flask view for the file at the given path, with the given envdata
     """
-    env = copy.deepcopy(envdata)
+    if envdata is None:
+        env = load_env(path.lstrip('/'))
+    else:
+        env = copy.deepcopy(envdata)
+
     if request.method == 'POST':
         env.update(request.get_json(force=True))
     secret_ids = serialize_secrets(env)

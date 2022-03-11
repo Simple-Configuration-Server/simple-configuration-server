@@ -28,6 +28,9 @@ def create_app():
     scs_conf_path = Path(config_dir, 'scs_conf.yaml')
     scs_conf = load_app_config(scs_conf_path)
 
+    if scs_conf['core']['load_env_on_demand']:
+        yaml.filecache.disable()
+
     # Register blueprints and pass configuration
     app.register_blueprint(
         audit.bp, **scs_conf['core']['audit_log']
