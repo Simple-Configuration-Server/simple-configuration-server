@@ -80,7 +80,7 @@ def json_error_response(e):
             id_ = e.description.get('id', id_)
         message = errors[e.code][id_]
     else:
-        id_ = non_word_chars_regex.sub('-', e.name)
+        id_ = non_word_chars_regex.sub('-', e.name.lower())
         message = e.description
 
     return error_response(

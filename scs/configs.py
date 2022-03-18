@@ -27,6 +27,7 @@ DEFAULT_ENV = {
     'status': 200,
 }
 
+
 @bp.record
 def init(setup_state: BlueprintSetupState):
     """
