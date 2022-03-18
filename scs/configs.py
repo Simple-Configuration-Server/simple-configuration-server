@@ -9,7 +9,7 @@ import copy
 import importlib
 
 from flask import (
-    Blueprint, render_template, request, abort, g
+    Blueprint, render_template, request, g, make_response
 )
 from flask.blueprints import BlueprintSetupState
 
@@ -21,6 +21,11 @@ bp = Blueprint('configs', __name__, url_prefix='/configs')
 file_folder = Path(__file__).absolute().parent
 url_structure = {}
 
+DEFAULT_ENV = {
+    'context': {},
+    'headers': {},
+    'status': 200,
+}
 
 @bp.record
 def init(setup_state: BlueprintSetupState):
@@ -225,11 +230,17 @@ def load_env(relative_path):
     """
     Load the full environment for the given relative path
     """
-    combined_env = {}
+    combined_env = copy.deepcopy(DEFAULT_ENV)
     rel_env_file_paths = get_env_file_hierarchy(relative_path)
 
     for rel_path in rel_env_file_paths:
         data = load_env_file(rel_path)
+        for key, value in data.items():
+            if isinstance(value, dict):
+                combined_env[key].update(value)
+            else:
+                combined_env[key] = value
+
         combined_env.update(data)
 
     return combined_env
@@ -259,13 +270,19 @@ def view_config_file(path: str, envdata: dict):
         env = copy.deepcopy(envdata)
 
     if request.method == 'POST':
-        env.update(request.get_json(force=True))
+        env['context'].update(request.get_json(force=True))
     secret_ids = serialize_secrets(env)
 
-    response = render_template(path.lstrip('/'), **env)
+    rendered_template = render_template(path.lstrip('/'), **env['context'])
+    response = make_response(rendered_template)
+    response.headers.clear()  # Remove the default 'html' content type
+    response.headers.update(env['headers'])
+    response.status = env['status']
+
     g.add_audit_event(event_type='config-loaded')
     if secret_ids:
         g.add_audit_event(
             event_type='secrets-loaded', secrets=list(secret_ids),
         )
+
     return response
