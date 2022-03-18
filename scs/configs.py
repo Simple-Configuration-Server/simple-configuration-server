@@ -263,9 +263,9 @@ def view_config_file(path: str, envdata: dict):
     secret_ids = serialize_secrets(env)
 
     response = render_template(path.lstrip('/'), **env)
-    g.add_audit_event(event_type='config_loaded')
+    g.add_audit_event(event_type='config-loaded')
     if secret_ids:
         g.add_audit_event(
-            event_type='secrets_loaded', secrets=list(secret_ids),
+            event_type='secrets-loaded', secrets=list(secret_ids),
         )
     return response

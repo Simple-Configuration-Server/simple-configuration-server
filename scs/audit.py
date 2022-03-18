@@ -22,21 +22,21 @@ events = {
         'level': logging.WARNING,
         'message_template': 'Unauthenticated request to {path} from {ip}',
     },
-    'unauthorized_ip': {
+    'unauthorized-ip': {
         'level': logging.WARNING,
         'message_template': "User '{user}' used from unauthorized IP {ip}",
     },
-    'unauthorized_path': {
+    'unauthorized-path': {
         'level': logging.WARNING,
         'message_template': (
             "User '{user}' tried to access {path} but is not authorized"
         )
     },
-    'config_loaded': {
+    'config-loaded': {
         'level': logging.INFO,
         'message_template': "User '{user}' has loaded {path}",
     },
-    'secrets_loaded': {
+    'secrets-loaded': {
         'level': logging.INFO,
         'message_template': (
             "User '{user}' has loaded the following secrets: {secrets}"

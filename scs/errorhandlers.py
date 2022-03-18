@@ -7,33 +7,41 @@ from flask import Blueprint, jsonify
 from jinja2 import TemplateError
 from yaml import YAMLError
 
+import re
+
+from werkzeug.exceptions import HTTPException
+
 bp = Blueprint('errorhandlers', __name__)
 
+non_word_chars_regex = re.compile(r'\W+')
+
+# All custom error messages are defined below. When no other context is
+# available, the error handler falls back on the first message.
 errors = {
     401: {
-        'unauthenticated': 'Invalid authentication credentials provided'
+        'unauthenticated': 'Invalid authentication credentials provided',
     },
     403: {
-        'unauthorized_ip': (
-            'You are not authorized to access the server from this IP'
-        ),
-        'unauthorized_path': (
-            'You are not authorized to access this path on the server'
-        ),
         'unauthorized': (
             'You are not authorized to access this resource'
-        )
+        ),
+        'unauthorized-ip': (
+            'You are not authorized to access the server from this IP'
+        ),
+        'unauthorized-path': (
+            'You are not authorized to access this path on the server'
+        ),
     },
     500: {
-        'failed_rendering_template': (
+        'internal-server-error': (
+            'An internal server error occured'
+        ),
+        'template-rendering-error': (
             'An error occured while trying to render the template'
         ),
-        'failed_loading_env': (
+        'env-loading-error': (
             'An error occured while loading the template env files'
         ),
-        'internal_error': (
-            'An internal server error occured'
-        )
     }
 }
 
@@ -48,40 +56,35 @@ def error_response(id_, message, code):
     }), code
 
 
-@bp.app_errorhandler(401)
-def unauthenticated(e):
-    id_ = 'unauthenticated'
-    return error_response(
-        id_,
-        errors[e.code][id_],
-        e.code
-    )
+def get_500_error_id(error):
+    """
+    Get the ID for a 500 error
+    """
+    id_ = next(iter(errors[500].keys()))
+    if isinstance(error.original_exception, YAMLError):
+        id_ = 'env-loading-error'
+    elif isinstance(error.original_exception, TemplateError):
+        id_ = 'template-rendering-error'
+
+    return id_
 
 
-@bp.app_errorhandler(403)
-def unauthorized(e):
-    id_ = 'unauthorized'
-    if isinstance(e.description, dict):
-        id_ = e.description.get('id', id_)
-
-    return error_response(
-        id_,
-        errors[e.code][id_],
-        e.code
-    )
-
-
-@bp.app_errorhandler(500)
-def server_error(e):
-    id_ = 'internal_error'
-    print(type(e).__name__)
-    if isinstance(e.original_exception, YAMLError):
-        id_ = 'failed_loading_env'
-    elif isinstance(e.original_exception, TemplateError):
-        id_ = 'failed_rendering_template'
+@bp.app_errorhandler(HTTPException)
+def json_error_response(e):
+    if e.code == 500:
+        id_ = get_500_error_id(e)
+        message = errors[e.code][id_]
+    elif e.code in errors:
+        id_ = next(iter(errors[e.code].keys()))
+        if isinstance(e.description, dict):
+            id_ = e.description.get('id', id_)
+        message = errors[e.code][id_]
+    else:
+        id_ = non_word_chars_regex.sub('-', e.name)
+        message = e.description
 
     return error_response(
         id_,
-        errors[e.code][id_],
+        message,
         e.code
     )

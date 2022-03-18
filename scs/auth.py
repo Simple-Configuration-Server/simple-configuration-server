@@ -148,7 +148,7 @@ def check_auth():
     # if the url is authorized
     user_ip = ipaddress.ip_network(request.remote_addr)
     if not is_whitelisted(user_ip, user['whitelist']):
-        event_type = 'unauthorized_ip'
+        event_type = 'unauthorized-ip'
         g.add_audit_event(event_type=event_type)
         abort(403, description={'id': event_type})
 
@@ -157,6 +157,6 @@ def check_auth():
         if pattern.match(request.path):
             break
     else:
-        event_type = 'unauthorized_path'
+        event_type = 'unauthorized-path'
         g.add_audit_event(event_type=event_type)
         abort(403, description={'id': event_type})
