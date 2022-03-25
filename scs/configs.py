@@ -6,14 +6,15 @@ configuration data and returns the formatted data
 from pathlib import Path
 from functools import partial
 import copy
-import importlib
 
 from flask import (
     Blueprint, render_template, request, g, make_response
 )
 from flask.blueprints import BlueprintSetupState
+import fastjsonschema
 
 from . import yaml
+from .tools import get_object_from_name
 
 bp = Blueprint('configs', __name__, url_prefix='/configs')
 
@@ -21,11 +22,15 @@ bp = Blueprint('configs', __name__, url_prefix='/configs')
 file_folder = Path(__file__).absolute().parent
 url_structure = {}
 
-DEFAULT_ENV = {
-    'context': {},
-    'headers': {},
-    'status': 200,
-}
+env_file_schema_path = Path(
+    Path(__file__).absolute().parent,
+    'schemas/scs-env.yaml'
+)
+env_file_schema = yaml.safe_load_file(env_file_schema_path)
+validate_env_file = fastjsonschema.compile(env_file_schema)
+
+# The default values are populsated from the JSON schema defaults
+DEFAULT_ENV = validate_env_file({})
 
 
 @bp.record
@@ -45,15 +50,15 @@ def init(setup_state: BlueprintSetupState):
     """
     global config_basepath, common_basepath, secrets_basepath
 
-    # Load setup_state options
-    opts = setup_state.options
-    config_basepath = Path(opts['directories']['config']).absolute()
-    common_basepath = Path(opts['directories']['common']).absolute()
-    secrets_basepath = Path(opts['directories']['secrets']).absolute()
-    add_constructors = opts['add_constructors']
-    check_templates = opts['template_check_during_init']
-    validate_dots = opts['reject_keys_with_dots']
-    load_on_demand = opts['load_env_on_demand']
+    scs_config = setup_state.app.config['SCS']
+
+    config_basepath = Path(scs_config['directories']['config']).absolute()
+    common_basepath = Path(scs_config['directories']['common']).absolute()
+    secrets_basepath = Path(scs_config['directories']['secrets']).absolute()
+    add_constructors = scs_config['extensions']['constructors']
+    check_templates = scs_config['templates']['validate_on_startup']
+    validate_dots = scs_config['environments']['reject_keys_containing_dots']
+    load_on_demand = not scs_config['environments']['cache']
 
     _initialize_yaml_loaders(
         common_dir=common_basepath,
@@ -70,6 +75,9 @@ def init(setup_state: BlueprintSetupState):
         # Keep traling newlines in configuration files
         'keep_trailing_newline': True,
     })
+    setup_state.app.jinja_options.update(
+        scs_config['templates']['rendering_options']
+    )
 
     bp.template_folder = config_basepath
 
@@ -99,19 +107,6 @@ def init(setup_state: BlueprintSetupState):
                 relative_url.lstrip('/')
             )
             template.render(**testenv)
-
-
-def get_constructor_class(full_ref: str) -> yaml.SCSYamlTagConstructor:
-    """
-    Gets the constructor class from a string that includes the full path (
-    prefixed with packages/modules)
-    """
-    path_components = full_ref.split('.')
-    module_ref = '.'.join(path_components[:-1])
-    classname = path_components[-1]
-
-    module = importlib.import_module(module_ref)
-    return getattr(module, classname)
 
 
 def _initialize_yaml_loaders(
@@ -147,9 +142,13 @@ def _initialize_yaml_loaders(
 
     if add_constructors:
         for constructor_config in add_constructors:
-            constructor_class = get_constructor_class(
-                constructor_config['class']
-            )
+            constructor_name = constructor_config['name']
+            constructor_class = get_object_from_name(constructor_name)
+            if not isinstance(constructor_class, yaml.SCSYamlTagConstructor):
+                raise ValueError(
+                    f"The constructor '{constructor_name}' is not a "
+                    "SCSYamlTagConstructor subclass"
+                )
             options = constructor_config.get('options', {})
             ENV_FILE_CONSTRUCTORS.append(
                 constructor_class(**options)
@@ -170,6 +169,10 @@ def _initialize_yaml_loaders(
         )
 
 
+class EnvFileFormatException(Exception):
+    """Raised if JSON schema validation fails on an env-file"""
+
+
 def load_env_file(relative_path: str) -> dict:
     """
     Load the data from the given env file, if it exists
@@ -178,7 +181,17 @@ def load_env_file(relative_path: str) -> dict:
     if not path.is_file():
         return {}
 
-    return yaml.load(path, loader=yaml.SCSEnvFileLoader)
+    env_data = yaml.load_file(path, loader=yaml.SCSEnvFileLoader)
+
+    try:
+        # Ignore the return, since we don't want to fill defaults
+        validate_env_file(env_data)
+    except fastjsonschema.JsonSchemaValueException as e:
+        raise EnvFileFormatException(
+            f'The env file {path.as_posix()} failed validation: {e.message}'
+        )
+
+    return env_data
 
 
 def get_env_file_hierarchy(relative_path: str) -> list[str]:

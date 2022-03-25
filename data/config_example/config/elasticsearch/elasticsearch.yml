@@ -1,4 +1,4 @@
-cluster.name: opendal-production
+cluster.name: {{ cluster_name }}
 node.name: '{{ node_name }}'
 path.data: /data/elasticsearch/data
 path.logs: /data/elasticsearch/logs

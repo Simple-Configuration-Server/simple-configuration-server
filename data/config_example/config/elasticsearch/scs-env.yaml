@@ -1,0 +1,2 @@
+context:
+  cluster_name: !scs-common 'common-vars.yaml#elasticsearch.cluster_name'

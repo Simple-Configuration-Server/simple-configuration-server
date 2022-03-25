@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import secrets
 
-from yaml import Loader, Node, SafeLoader, dump
+from yaml import Loader, Node, SafeLoader, dump, safe_load
 
 
 index_regex = re.compile(r'\[(\d+)\]')
@@ -90,7 +90,7 @@ class SCSEnvFileLoader(SCSYamlLoader):
     pass
 
 
-def load(path: Path, loader: SCSYamlLoader) -> Any:
+def load_file(path: Path, loader: SCSYamlLoader) -> Any:
     """
     Load data from the given path, using the provided loader
     """
@@ -109,6 +109,14 @@ def load(path: Path, loader: SCSYamlLoader) -> Any:
     filecache.add_file(path, data)
 
     return data
+
+
+def safe_load_file(path: Path) -> Any:
+    """
+    Use the default pyyaml SafeLoader to load a file (uncached)
+    """
+    with open(path, 'r', encoding='utf8') as yamlfile:
+        return safe_load(yamlfile)
 
 
 class RelativePathMixin:
@@ -144,7 +152,7 @@ class RelativePathMixin:
         # Resolve full path
         file_path = Path(base_dir, file_path)
 
-        file_data = load(file_path, loader=self.loader)
+        file_data = load_file(file_path, loader=self.loader)
 
         if self.validate_dots and self._contains_keys_with_dots(file_data):
             raise ValueError(

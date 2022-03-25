@@ -1,0 +1,25 @@
+description: All *.scs-env.yaml files are validated against this schema
+type: object
+additionalProperties: False
+properties:
+  context:
+    type: object
+    default: {}
+  headers:
+    type: object
+    default: {}
+    patternProperties:
+      ^.*$:
+        type: string
+        description: All header values must be given as strings
+  status:
+    type: integer
+    default: 200
+    minimum: 100
+    exclusiveMaximum: 600
+patterProperties:
+  ^x-.*$:
+    description:
+      Use additional variables, prefixed with x- to store common values or
+      objects that are re-used in multiple variables. Use Yaml anchors to
+      reference these variables.

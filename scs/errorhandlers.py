@@ -2,14 +2,15 @@
 """
 Flask Blueprint that contains the custom error handlers for SCS
 """
-from flask import Blueprint, jsonify
-
-from jinja2 import TemplateError
-from yaml import YAMLError
-
 import re
 
+from flask import Blueprint, jsonify
+from jinja2 import TemplateError
+from yaml import YAMLError
 from werkzeug.exceptions import HTTPException
+
+from .configs import EnvFileFormatException
+
 
 bp = Blueprint('errorhandlers', __name__)
 
@@ -18,6 +19,12 @@ non_word_chars_regex = re.compile(r'\W+')
 # All custom error messages are defined below. When no other context is
 # available, the error handler falls back on the first message.
 errors = {
+    400: {
+        'bad-request': (
+            'Your request is invalid. For POST requests, check the JSON'
+            ' payload format'
+        )
+    },
     401: {
         'unauthenticated': 'Invalid authentication credentials provided',
     },
@@ -39,11 +46,20 @@ errors = {
         'template-rendering-error': (
             'An error occured while trying to render the template'
         ),
-        'env-loading-error': (
-            'An error occured while loading the template env files'
+        'env-syntax-error': (
+            'The YAML syntax in an env file could not be parsed'
+        ),
+        'env-format-error': (
+            'An env file was provided in an invalid format'
         ),
     }
 }
+
+exception_error_ids = [
+    (YAMLError, 'env-syntax-error'),
+    (TemplateError, 'template-rendering-error'),
+    (EnvFileFormatException, 'env-format-error')
+]
 
 
 def error_response(id_, message, code):
@@ -61,10 +77,10 @@ def get_500_error_id(error):
     Get the ID for a 500 error
     """
     id_ = next(iter(errors[500].keys()))
-    if isinstance(error.original_exception, YAMLError):
-        id_ = 'env-loading-error'
-    elif isinstance(error.original_exception, TemplateError):
-        id_ = 'template-rendering-error'
+    for exception_cls, error_id in exception_error_ids:
+        if isinstance(error.original_exception, exception_cls):
+            id_ = error_id
+            break
 
     return id_
 

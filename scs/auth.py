@@ -43,11 +43,12 @@ def init(setup_state: BlueprintSetupState):
 
     # Get options
     opts = setup_state.options
-    scs_auth_path = Path(opts['SCS_CONFIG_DIR'], 'scs_auth.yaml')
-    private_only = opts['private_only']
-    ip_whitelist = opts['ip_whitelist']
-    secrets_dir = opts['secrets_dir']
-    validate_dots = opts['reject_keys_with_dots']
+    scs_auth_path = Path(opts['users_file'])
+    private_only = opts['networks']['private_only']
+    network_whitelist = opts['networks']['whitelist']
+    secrets_dir = opts['directories']['secrets']
+    validate_dots = setup_state.app.config['SCS']['environments']\
+        ['reject_keys_containing_dots']
 
     # Load the scs_auth.yaml file
     secrets_constructor = yaml.SCSSecretConstructor(
@@ -57,12 +58,12 @@ def init(setup_state: BlueprintSetupState):
     SCSAuthFileLoader.add_constructor(
         secrets_constructor.tag, secrets_constructor.construct
     )
-    scs_auth = yaml.load(scs_auth_path, loader=SCSAuthFileLoader)
+    scs_auth = yaml.load_file(scs_auth_path, loader=SCSAuthFileLoader)
     serialize_secrets(scs_auth)
 
     # Parse whitelisted IP ranges:
     parsed_global_whitelist = [
-        ipaddress.ip_network(ip_range) for ip_range in ip_whitelist
+        ipaddress.ip_network(network) for network in network_whitelist
     ]
 
     # Check if these are all private
@@ -76,34 +77,31 @@ def init(setup_state: BlueprintSetupState):
 
     # Create the mapping
     auth_mapping = {}
-    for account in scs_auth['accounts']:
-        auth_mapping[account.pop('token')] = account
-        # Parse the IP whitelist
-        if 'whitelist' in account:
-            parsed_whitelist = []
-            for item in account['whitelist']:
-                network = ipaddress.ip_network(item)
-                if not is_whitelisted(network, parsed_global_whitelist):
-                    raise ValueError(
-                        f"Network {str(network)} of account '{account['id']} "
-                        "is not globally whitelisted!"
-                    )
-                if private_only and not network.is_private:
-                    raise ValueError(
-                        f"Network {str(network)} of account '{account['id']} "
-                        "is not private, but private_only is enabled!"
-                    )
-                parsed_whitelist.append(network)
-            account['whitelist'] = parsed_whitelist
-        # Parse the path whitelist regexes
-        if 'allowed' in account:
-            parsed_allowed = []
-            for item in account['allowed']:
-                regex_str = '^' + re.escape(item).replace(r'\*', '(.*)') + '$'
-                parsed_allowed.append(
-                    re.compile(regex_str)
+    for user in scs_auth['users']:
+        auth_mapping[user.pop('token')] = user
+        parsed_whitelist = []
+        for item in user['has_access']['from_networks']:
+            network = ipaddress.ip_network(item)
+            if not is_whitelisted(network, parsed_global_whitelist):
+                raise ValueError(
+                    f"Network {str(network)} of user '{user['id']} "
+                    "is not globally whitelisted!"
                 )
-            account['allowed'] = parsed_allowed
+            if private_only and not network.is_private:
+                raise ValueError(
+                    f"Network {str(network)} of user '{user['id']} "
+                    "is not private, but private_only is enabled!"
+                )
+            parsed_whitelist.append(network)
+        user['has_access']['from_networks'] = parsed_whitelist
+        # Parse the path whitelist regexes
+        parsed_allowed = []
+        for item in user['has_access']['to_paths']:
+            regex_str = '^' + re.escape(item).replace(r'\*', '(.*)') + '$'
+            parsed_allowed.append(
+                re.compile(regex_str)
+            )
+        user['has_access']['to_paths'] = parsed_allowed
 
 
 def is_whitelisted(
@@ -147,13 +145,13 @@ def check_auth():
     # User is authenticated. Now check (1) if the ip is in the whitelist, (2)
     # if the url is authorized
     user_ip = ipaddress.ip_network(request.remote_addr)
-    if not is_whitelisted(user_ip, user['whitelist']):
+    if not is_whitelisted(user_ip, user['has_access']['from_networks']):
         event_type = 'unauthorized-ip'
         g.add_audit_event(event_type=event_type)
         abort(403, description={'id': event_type})
 
     # Check if the user is allowed to access the provided url
-    for pattern in user['allowed']:
+    for pattern in user['has_access']['to_paths']:
         if pattern.match(request.path):
             break
     else:

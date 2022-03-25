@@ -1,0 +1,54 @@
+directories:
+  common: !scs-expand-env ${SCS_CONFIG_DIR}/common
+  config: !scs-expand-env ${SCS_CONFIG_DIR}/config
+  secrets: &secrets-dir !scs-expand-env ${SCS_CONFIG_DIR}/secrets
+
+environments:
+  cache: true
+  reject_keys_containing_dots: true
+
+templates:
+  validate_on_startup: true
+  rendering_options: {}
+
+logs:
+  audit:
+  #   file:
+  #     path: /var/log/scs/audit.log.jsonl
+  #     max_size_mb: 1
+  #     backup_count: 5
+  #     level: INFO
+    stdout:
+      level: INFO
+  application:
+    # file:
+    #   path: /var/log/scs/app.log.jsonl
+    #   max_size_mb: 1
+    #   backup_count: 5
+    #   level: INFO
+    stdout:
+      level: INFO
+
+auth:
+  module: scs.auth
+  options:
+    users_file: !scs-expand-env ${SCS_CONFIG_DIR}/scs-users.yaml
+    directories:
+      secrets: *secrets-dir
+    networks:
+      private_only: true
+      whitelist:
+      - 127.0.0.1/32
+      - 172.16.134.0/24
+
+extensions:
+  constructors: []
+    # - name: scs.dummy_constructors.GeneratePhraseConstructor
+    #   options:
+    #     startswith: 'This is ideal because'
+  blueprints: []
+    # - name: scs.dummy_blueprint.bp
+    #   options:
+    #     print_all_requests: true
+  jinja2: []
+    # - name: scs.jinja_extensions.GreatExtension

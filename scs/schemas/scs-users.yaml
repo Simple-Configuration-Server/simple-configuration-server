@@ -1,0 +1,67 @@
+type: object
+description:
+  Configuration file for the users list of the builtin scs.auth module
+required:
+  - users
+additionalProperties: false
+properties:
+  users:
+    type: array
+    items:
+      type: object
+      description: Definition of a single user
+      required:
+        - id
+        - token
+        - has_access
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          description:
+            Unique identifier for the user. This is used inside the access logs
+        token:
+          type: string
+          description:
+            Authentication token that the user needs to use to connect with
+        has_access:
+          description:
+            Configuration defining the access contraints of the user (using
+            whitelists)
+          type: object
+          required:
+            - to_paths
+            - from_networks
+          additionalProperties: false
+          properties:
+            to_paths:
+              type: array
+              description:
+                The paths a user has access to, e.g. '/configs/*' to access
+                all configuration files
+              items:
+                type: string
+                description:
+                  The path to which a user is allowed access. You can add '*'
+                  as a wildcard
+            from_networks:
+              type: array
+              description:
+                The networks from which a user is allowed to access the server.
+              items:
+                type: string
+                description:
+                  Either a IP address (127.0.0.1) or a subnet in CIDR notation
+                  (192.168.1.0/24)
+              
+
+patterProperties:
+  ^x-.*$:
+    description:
+      Use additional variables, prefixed with x- to store common values or
+      objects that are re-used for multiple users. You can use this for example
+      to specify lists of config paths that should be accessible to specific
+      services, or to define the IPs of machines, used by multiple users, in
+      one place. Use YAML anchors to reference these parts from the
+      users list.
+  

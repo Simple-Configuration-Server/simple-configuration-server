@@ -1,0 +1,232 @@
+# Schema (JSON Schema Syntax) for the scs-configuration.yaml file
+type: object
+description: Configuration file for the SCS server
+additionalProperties: false
+required:
+  - directories
+  - logs
+  - auth
+  # Note that 'extensions' is optional
+properties:
+  directories:
+    description:
+      The directories used to load the configuration files, environments and
+      secrets from
+    type: object
+    additionalProperties: false
+    required:
+      - common
+      - config
+      # If you don't use the builtin secrets management, you may ignore this
+      # variable
+    properties:
+      common:
+        type: string
+        description:
+          Path containing yaml files with common configuration variables. Files
+          under this directory can be referenced in environment files using the
+          '!scs-common' YAML tag
+      secrets:
+        type: string
+        description:
+          Path containing the yaml files that hold the secrets. Files under
+          this directory can be referenced from environment files using the
+          '!scs-secret' YAML tag. If you don't use this YAML tag, but rather
+          another constructor to reference secrets, this variable is optional
+      config:
+        type: string
+        description:
+          Path containing the configuration file templates and their
+          corresponding environment (*scs-env.yaml) files.
+  
+  
+  environments:
+    description:
+      Settings related to the loading of environment (*scs-env.yaml) files
+    default:
+      cache: true
+      reject_keys_containing_dots: true
+    type: object
+    additionalProperties: false
+    properties:
+      cache:
+        type: boolean
+        description:
+          If true, environment files are loaded once on startup. Disable this
+          if you plan to change files when the server is running or if you use
+          custom YAML constructors of which the values change over time.
+        default: true
+      reject_keys_containing_dots:
+        type: boolean
+        description:
+          If true, the YAML loader checks if there are dots in the keys of
+          referenced files, and errors are raised when true. Dots in keys
+          prevent users from being able to reference them, since dots are used
+          to seperate keys. Disable this if you have keys with dots inside
+          structures that are being referenced (E.g. you only reference the
+          root key of an object, and the dotted keys are contained in the
+          object). Note that if 'cache' is disabled, this produces errors at
+          request time, rather than aborting the startup process of the server.
+        default: true
+  
+
+  templates:
+    description:
+      Settings related to the loading of templates
+    type: object
+    default:
+      validate_on_startup: true
+      rendering_options: {}
+    additionalProperties: false
+    properties:
+      validate_on_startup:
+        type: boolean
+        description:
+          Load each template on startup to validate if the syntax used in the
+          templates is correct. On errors, startup is aborted. In cases where
+          you use post-requests to send (a part of) the variables in a
+          configuration file, you may want to disable this, since template
+          loading may fail without these variables.
+        default: true
+      rendering_options:
+        type: object
+        description:
+          Allows you to set custom environment rendering options. The full
+          list of available options can be found on in the Jinja documentation
+          (https://jinja.palletsprojects.com/en/3.0.x/api/)
+  
+
+  logs:
+    description:
+      Logging settings for SCS. SCS generates 'audit' logs, that contain
+      audit events (e.g. what user loads which secrets) and 'app' logs, that
+      contain things like application errors
+    type: object
+    required:
+      - audit
+      - application
+    additionalProperties: false
+    properties:
+      audit: &log-configuration
+        type: object
+        additionalProperties: false
+        minProperties: 1
+        properties:
+          file:
+            description:
+              Configuration for logging to a file. A rotating file handler
+              is used for this.
+            type: object
+            additionalProperties: false
+            required:
+              - path
+              - max_size_mb
+              - backup_count
+              - level
+            properties:
+              path:
+                type: string
+                description: The path to store the log file
+              max_size_mb:
+                type: integer
+                description: Maximum size of the log file before rollover
+              backup_count:
+                type: integer
+                description: The number of backups to keey after rollover
+              level: &level-setting
+                type: string
+                enum:
+                  - CRITICAL
+                  - ERROR
+                  - WARNING
+                  - INFO
+                  - DEBUG
+          stdout:
+            type: object
+            additionalProperties: false
+            required:
+              - level
+            properties:
+              level: *level-setting
+      application: *log-configuration
+  
+
+  auth:
+    type: object
+    required:
+      - module
+      - options
+    properties:
+      module:
+        type: string
+        description:
+          The Python module used for authentication. A module should contain
+          a '.bp' attribute which is a Flask Blueprint. Use the
+          bp.record decorator on a initialization function. This function gets
+          passed a BluePrintSetupState, which contains the options that are
+          defined under the 'options' parameter
+        default: scs.auth
+      options:
+        type: object
+        description:
+          This object will be passed as options through
+        examples:
+          # The configuration parameters used by the default scs.auth module
+          - users_file: /etc/scs/scs-users.yaml
+            directories:
+              secrets: /var/scs/application-secrets/
+            networks:
+              private_only: true
+              whitelist:
+                - 127.0.0.1/32
+                - 172.16.134.0/24
+  
+  extensions:
+    description:
+      The base functionality of SCS can be extended at runtime, by (1) loading
+      additional constructors for resolving template tags, (2) loading
+      additional flask blueprints and (3) loading additional jinja2 extensions
+      which allow you to use custom tags in the templates
+    type: object
+    default:
+      constructors: []
+      blueprints: []
+      jinja2: []
+    additionalProperties: false
+    properties:
+      constructors: &module-element-reference
+        description:
+          A list of YAML constructor classes. These should inherit from the
+          scs.yaml.SCSYamlTagConstructor class
+        type: array
+        items:
+          type: object
+          required:
+            - class
+          additionalProperties: false
+          properties:
+            name:
+              type: string
+              description:
+                The location of the object to load. Everything before the last
+                dot is considered to be the module name, and the part after is
+                the class/instance/variable name to load
+            options:
+              type: object
+              description:
+                When applicable, the data in this object is passed as keyword
+                arguments when the class is initialized.
+      blueprints:
+        <<: *module-element-reference
+        description:
+          The Flask BluePrints to load. Note that the options are passed as
+          keyword arguments to the Flask.register_blueprint method, meaning
+          they are accessible in the BluePrintSetupState of blueprint
+          initialization (decorated with bp.record) functions.
+      jinja2:
+        <<: *module-element-reference
+        description:
+          A list of Jinja2 extensions that should be loaded. Note that options
+          cannot be passed to these at init. As described in the Jinja
+          documentation, use the environment options (under
+          template.rendering_options) to pass variables to these.

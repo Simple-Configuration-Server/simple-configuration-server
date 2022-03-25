@@ -7,48 +7,55 @@ import os
 import importlib
 
 from flask import Flask
+import fastjsonschema
 
-from . import configs, audit, yaml, errorhandlers
+from . import configs, errorhandlers, logging, yaml
+from .tools import get_object_from_name
 
 current_dir = Path(__file__).absolute().parent
 
 
-def create_app():
+def create_app() -> Flask:
     """
     Factory to create the Flask app for the Simple Configuration Server
+
+    Returns:
+        The main flask application
     """
     # create and configure the app
     app = Flask(__name__)
 
-    # Load the SCS application configuration
-    config_dir = Path(os.environ['SCS_CONFIG_DIR']).absolute()
-    if not config_dir.is_dir():
-        raise ValueError('The provided SCS_CONFIG_DIR does not exist!')
+    configuration = load_application_configuration()
 
-    scs_conf_path = Path(config_dir, 'scs_conf.yaml')
-    scs_conf = load_app_config(scs_conf_path)
+    # The auth configuration is passed to the blueprint directly
+    # and not available on the global configuration object
+    auth_config = configuration.pop('auth')
 
-    if scs_conf['core']['load_env_on_demand']:
+    app.config['SCS'] = configuration
+
+    if not configuration['environments']['cache']:
         yaml.filecache.disable()
 
-    # Register blueprints and pass configuration
-    app.register_blueprint(
-        audit.bp, **scs_conf['core']['audit_log']
-    )
+    # Register default blueprints
+    app.register_blueprint(logging.bp)
     app.register_blueprint(errorhandlers.bp)
-    app.register_blueprint(
-        configs.bp,
-        add_constructors=scs_conf.get('add_constructors', []),
-        **scs_conf['core'],
-    )
+    app.register_blueprint(configs.bp)
 
-    auth_module = importlib.import_module(scs_conf['auth']['module'])
+    # Register auth Blueprint, and pass
+    auth_module = importlib.import_module(auth_config['module'])
     app.register_blueprint(
         auth_module.bp,
-        SCS_CONFIG_DIR=config_dir,
-        reject_keys_with_dots=scs_conf['core']['reject_keys_with_dots'],
-        **scs_conf['auth']['options'],
+        **auth_config['options'],
     )
+
+    # Load blueprint & jinja2 extensions
+    for bp in configuration['extensions']['blueprints']:
+        app.register_blueprint(
+            get_object_from_name(bp['name']),
+            **bp.get('options', {})
+        )
+    for jinja_extension in configuration['extensions']['jinja2']:
+        app.jinja_env.add_extension(jinja_extension['name'])
 
     # Clear the cache that was used to load all files
     yaml.filecache.clear()
@@ -56,9 +63,9 @@ def create_app():
     return app
 
 
-def load_app_config(path: Path) -> dict:
+def load_application_configuration() -> dict:
     """
-    Loads the main SCS config file
+    Loads the main SCS configuratoin file
 
     Args:
         path: The path to the configuration file
@@ -66,9 +73,26 @@ def load_app_config(path: Path) -> dict:
     Returns:
         The configuration file data
     """
-    # Add constructors to the loader, and load the file
+    # Get the configuration file path
+    config_dir = Path(os.environ['SCS_CONFIG_DIR']).absolute()
+    if not config_dir.is_dir():
+        raise ValueError('The provided SCS_CONFIG_DIR does not exist!')
+
+    scs_conf_path = Path(config_dir, 'scs-configuration.yaml')
+
+    # Enable Environment variable expansion for yaml loader and load the config
+    # file
     expand_env_constructor = yaml.SCSExpandEnvConstructor()
     yaml.SCSAppConfigLoader.add_constructor(
         expand_env_constructor.tag, expand_env_constructor.construct
     )
-    return yaml.load(path, yaml.SCSAppConfigLoader)
+
+    configuration_data = yaml.load_file(scs_conf_path, yaml.SCSAppConfigLoader)
+
+    # Load the schema to validate the configuration file against
+    schema_path = Path(
+        Path(__file__).absolute().parent, 'schemas/scs-configuration.yaml',
+    )
+    configuration_schema = yaml.safe_load_file(schema_path)
+
+    return fastjsonschema.validate(configuration_schema, configuration_data)

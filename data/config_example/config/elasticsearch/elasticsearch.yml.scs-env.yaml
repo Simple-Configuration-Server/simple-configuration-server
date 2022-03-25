@@ -1,6 +1,9 @@
-hosts: !scs-common 'common-vars.yaml#hosts'
-main_host: !scs-common 'common-vars.yaml#hosts.[0]'
-http_port: !scs-common 'common-vars.yaml#elasticsearch.port'
-node_name: "main ES host"
-password: !scs-secret 'es_secrets.yaml#password'
-heap: !scs-relative 'jvm.options.scs-env.yaml#jvm_heap'
+context:
+  hosts: !scs-common 'common-vars.yaml#hosts'
+  main_host: !scs-common 'common-vars.yaml#hosts.[0]'
+  http_port: !scs-common 'common-vars.yaml#elasticsearch.port'
+  node_name: "main ES host"
+  password: !scs-secret 'es_secrets.yaml#password'
+  heap: !scs-relative 'jvm.options.scs-env.yaml#context.jvm_heap'
+headers:
+  Content-Type: 'application/x-yaml'
