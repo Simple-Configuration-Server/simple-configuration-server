@@ -12,13 +12,13 @@ from werkzeug.exceptions import HTTPException
 from .configs import EnvFileFormatException
 
 
-bp = Blueprint('errorhandlers', __name__)
+bp = Blueprint('errors', __name__)
 
 non_word_chars_regex = re.compile(r'\W+')
 
 # All custom error messages are defined below. When no other context is
 # available, the error handler falls back on the first message.
-errors = {
+definitions = {
     400: {
         'bad-request': (
             'Your request is invalid. For POST requests, check the JSON'
@@ -55,7 +55,7 @@ errors = {
     }
 }
 
-exception_error_ids = [
+exception_ids = [
     (YAMLError, 'env-syntax-error'),
     (TemplateError, 'template-rendering-error'),
     (EnvFileFormatException, 'env-format-error')
@@ -76,8 +76,8 @@ def get_500_error_id(error):
     """
     Get the ID for a 500 error
     """
-    id_ = next(iter(errors[500].keys()))
-    for exception_cls, error_id in exception_error_ids:
+    id_ = next(iter(definitions[500].keys()))
+    for exception_cls, error_id in exception_ids:
         if isinstance(error.original_exception, exception_cls):
             id_ = error_id
             break
@@ -89,12 +89,12 @@ def get_500_error_id(error):
 def json_error_response(e):
     if e.code == 500:
         id_ = get_500_error_id(e)
-        message = errors[e.code][id_]
-    elif e.code in errors:
-        id_ = next(iter(errors[e.code].keys()))
+        message = definitions[e.code][id_]
+    elif e.code in definitions:
+        id_ = next(iter(definitions[e.code].keys()))
         if isinstance(e.description, dict):
             id_ = e.description.get('id', id_)
-        message = errors[e.code][id_]
+        message = definitions[e.code][id_]
     else:
         id_ = non_word_chars_regex.sub('-', e.name.lower())
         message = e.description

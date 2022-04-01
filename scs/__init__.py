@@ -9,7 +9,7 @@ import importlib
 from flask import Flask
 import fastjsonschema
 
-from . import configs, errorhandlers, logging, yaml
+from . import configs, errors, logging, yaml
 from .tools import get_object_from_name
 
 current_dir = Path(__file__).absolute().parent
@@ -38,7 +38,7 @@ def create_app() -> Flask:
 
     # Register default blueprints
     app.register_blueprint(logging.bp)
-    app.register_blueprint(errorhandlers.bp)
+    app.register_blueprint(errors.bp)
     app.register_blueprint(configs.bp)
 
     # Register auth Blueprint, and pass
