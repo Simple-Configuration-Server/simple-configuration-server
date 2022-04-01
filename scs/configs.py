@@ -8,7 +8,7 @@ from functools import partial
 import copy
 
 from flask import (
-    Blueprint, render_template, request, g, make_response, abort
+    Blueprint, request, g, make_response, abort, current_app
 )
 from flask.blueprints import BlueprintSetupState
 import fastjsonschema
@@ -57,6 +57,7 @@ def init(setup_state: BlueprintSetupState):
     secrets_basepath = Path(scs_config['directories']['secrets']).absolute()
     add_constructors = scs_config['extensions']['constructors']
     check_templates = scs_config['templates']['validate_on_startup']
+    default_rendering_options = scs_config['templates']['rendering_options']
     validate_dots = scs_config['environments']['reject_keys_containing_dots']
     load_on_demand = not scs_config['environments']['cache']
 
@@ -68,16 +69,7 @@ def init(setup_state: BlueprintSetupState):
     )
 
     # Configure template rendering options
-    setup_state.app.jinja_options.update({
-        # Make sure if statements and for-loops do not add unnecessary newlines
-        'trim_blocks': True,
-        'lstrip_blocks': True,
-        # Keep traling newlines in configuration files
-        'keep_trailing_newline': True,
-    })
-    setup_state.app.jinja_options.update(
-        scs_config['templates']['rendering_options']
-    )
+    setup_state.app.jinja_options.update(default_rendering_options)
 
     bp.template_folder = config_basepath
 
@@ -274,6 +266,14 @@ def get_relative_config_template_paths() -> list[str]:
     return config_template_paths
 
 
+# These seem to erroneously not be supported on the overlay function
+# https://github.com/pallets/jinja/issues/1645
+MISSING_OVERLAY_OPTIONS = [
+    'newline_sequence',
+    'keep_trailing_newline'
+]
+
+
 def view_config_file(path: str, envdata: dict):
     """
     Flask view for the file at the given path, with the given envdata
@@ -288,9 +288,26 @@ def view_config_file(path: str, envdata: dict):
 
     if request.method == 'POST':
         env['context'].update(request.get_json(force=True))
+
     secret_ids = serialize_secrets(env)
 
-    rendered_template = render_template(path.lstrip('/'), **env['context'])
+    if rendering_options := env['rendering_options']:
+        # Since some options seem to erroneously not be supported, these are
+        # applied later
+        # https://github.com/pallets/jinja/issues/1645
+        unsupported_options = {}
+        for key in MISSING_OVERLAY_OPTIONS:
+            if key in rendering_options:
+                unsupported_options[key] = rendering_options.pop(key)
+        jinja_env = current_app.jinja_env.overlay(**rendering_options)
+        for key, value in unsupported_options.items():
+            setattr(jinja_env, key, value)
+    else:
+        jinja_env = current_app.jinja_env
+
+    template = jinja_env.get_template(path.lstrip('/'))
+    rendered_template = template.render(env['context'])
+
     response = make_response(rendered_template)
     response.headers.clear()  # Remove the default 'html' content type
     response.headers.update(env['headers'])

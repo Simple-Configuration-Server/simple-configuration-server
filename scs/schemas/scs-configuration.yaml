@@ -91,11 +91,21 @@ properties:
         default: true
       rendering_options:
         type: object
-        default: {}
+        default:
+          trim_blocks: true
+          lstrip_blocks: true
+          keep_trailing_newline: true
         description:
           Allows you to set custom environment rendering options. The full
           list of available options can be found on in the Jinja documentation
           (https://jinja.palletsprojects.com/en/3.0.x/api/)
+        properties:
+          trim_blocks:
+            default: true
+          lstrip_blocks:
+            default: true
+          keep_trailing_newline:
+            default: true
       cache:
         type: boolean
         default: true

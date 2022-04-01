@@ -9,3 +9,5 @@ headers:
   Content-Type: 'application/x-yaml'
 methods:
   - GET
+rendering_options:
+  keep_trailing_newline: false
