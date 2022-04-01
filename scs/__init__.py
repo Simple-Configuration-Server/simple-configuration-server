@@ -36,6 +36,9 @@ def create_app() -> Flask:
     if not configuration['environments']['cache']:
         yaml.filecache.disable()
 
+    if not configuration['templates']['cache']:
+        app.config['TEMPLATES_AUTO_RELOAD'] = True
+
     # Register default blueprints
     app.register_blueprint(logging.bp)
     app.register_blueprint(errors.bp)

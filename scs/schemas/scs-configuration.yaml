@@ -75,6 +75,7 @@ properties:
       Settings related to the loading of templates
     type: object
     default:
+      cache: true
       validate_on_startup: true
       rendering_options: {}
     additionalProperties: false
@@ -90,10 +91,18 @@ properties:
         default: true
       rendering_options:
         type: object
+        default: {}
         description:
           Allows you to set custom environment rendering options. The full
           list of available options can be found on in the Jinja documentation
           (https://jinja.palletsprojects.com/en/3.0.x/api/)
+      cache:
+        type: boolean
+        default: true
+        description:
+          If false, TEMPLATES_AUTO_RELOAD is enabled. By default, templates are
+          cached, and changes to them are not reflected in responses until the
+          server is restarted.
   
 
   logs:
