@@ -8,7 +8,7 @@ from functools import partial
 import copy
 
 from flask import (
-    Blueprint, render_template, request, g, make_response
+    Blueprint, render_template, request, g, make_response, abort
 )
 from flask.blueprints import BlueprintSetupState
 import fastjsonschema
@@ -282,6 +282,9 @@ def view_config_file(path: str, envdata: dict):
         env = load_env(path.lstrip('/'))
     else:
         env = copy.deepcopy(envdata)
+
+    if request.method not in envdata['methods']:
+        abort(405)
 
     if request.method == 'POST':
         env['context'].update(request.get_json(force=True))

@@ -39,6 +39,11 @@ definitions = {
             'You are not authorized to access this path on the server'
         ),
     },
+    405: {
+        'method-not-allowed': (
+            'This HTTP request method cannot be used on the endpoint'
+        ),
+    },
     500: {
         'internal-server-error': (
             'An internal server error occured'

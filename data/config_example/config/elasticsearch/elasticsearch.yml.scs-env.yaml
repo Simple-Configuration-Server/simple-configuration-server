@@ -7,3 +7,5 @@ context:
   heap: !scs-relative 'jvm.options.scs-env.yaml#context.jvm_heap'
 headers:
   Content-Type: 'application/x-yaml'
+methods:
+  - GET

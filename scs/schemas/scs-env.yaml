@@ -3,9 +3,13 @@ type: object
 additionalProperties: False
 properties:
   context:
+    description:
+      The contents of this object are passed as context for rendering the
+      templates
     type: object
     default: {}
   headers:
+    description: Response headers returned when requesting the resource
     type: object
     default: {}
     patternProperties:
@@ -13,10 +17,26 @@ properties:
         type: string
         description: All header values must be given as strings
   status:
+    description: Response status code
     type: integer
     default: 200
     minimum: 100
     exclusiveMaximum: 600
+  methods:
+    description:
+      Allowed methods. For example, if the context is incomplete by default,
+      only a POST method should be allowed, since otherwise a template
+      rendering error may occur
+    type: array
+    default:
+      - GET
+      - POST
+    uniqueItems: true
+    items:
+      # Only GET and POST can be handled for configs
+      enum:
+        - GET
+        - POST
 patterProperties:
   ^x-.*$:
     description:
