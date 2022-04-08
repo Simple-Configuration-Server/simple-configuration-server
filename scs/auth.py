@@ -6,6 +6,7 @@ authorization of users/clients
 from pathlib import Path
 import re
 import ipaddress
+import datetime
 
 from flask import Blueprint, request, abort, g
 from flask.blueprints import BlueprintSetupState
@@ -26,6 +27,49 @@ class SCSAuthFileLoader(yaml.SCSYamlLoader):
     pass
 
 
+class RateLimiter:
+    """
+    Tracks invalid authentication attempts for the current 15 minute interval
+    and blacklists IPs when too many invalid authentication attempts were made.
+
+    Ensures that passwords cannot be brute-forced
+    """
+    def __init__(self, *, max_auth_fails_per_15_min: int):
+        self._current_window = self._get_window_id()
+        self._invalid_auth_attempts = {}
+        self.max_auth_fails = max_auth_fails_per_15_min
+
+    def register_attempt(self, ip: str):
+        invalid_auth_attempts = self.invalid_auth_attempts
+
+        if ip not in invalid_auth_attempts:
+            invalid_auth_attempts[ip] = 0
+
+        invalid_auth_attempts[ip] += 1
+
+    def is_limited(self, ip: str) -> bool:
+        return self.invalid_auth_attempts.get(ip, 0) >= self.max_auth_fails
+
+    @property
+    def invalid_auth_attempts(self) -> dict:
+        window_id = self._get_window_id()
+
+        # Reset attempts if a new window is reached
+        if self._current_window != window_id:
+            self._current_window = window_id
+            self._invalid_auth_attempts = {}
+
+        return self._invalid_auth_attempts
+
+    def _get_window_id(self) -> str:
+        """
+        Get the id of the current 15 minute window
+        """
+        now = datetime.datetime.utcnow()
+        minute_rounded = now.minute - (now.minute % 15)
+        return f'{now.year}{now.month}{now.day}{now.hour}{minute_rounded}'
+
+
 @bp.record
 def init(setup_state: BlueprintSetupState):
     """
@@ -39,7 +83,7 @@ def init(setup_state: BlueprintSetupState):
                 private_only: bool
                 ip_whitelist: list[str]
     """
-    global auth_mapping
+    global auth_mapping, rate_limiter
 
     # Get options
     opts = setup_state.options
@@ -47,8 +91,15 @@ def init(setup_state: BlueprintSetupState):
     private_only = opts['networks']['private_only']
     network_whitelist = opts['networks']['whitelist']
     secrets_dir = opts['directories']['secrets']
-    validate_dots = setup_state.app.config['SCS']['environments']\
-        ['reject_keys_containing_dots']
+    max_auth_fails_per_15_min = opts['max_auth_fails_per_15_min']
+    validate_dots = setup_state.app.config['SCS']['environments'][
+        'reject_keys_containing_dots'
+    ]
+
+    # Initialize the rate limiter
+    rate_limiter = RateLimiter(
+        max_auth_fails_per_15_min=max_auth_fails_per_15_min
+    )
 
     # Load the scs_auth.yaml file
     secrets_constructor = yaml.SCSSecretConstructor(
@@ -132,6 +183,10 @@ def check_auth():
     """
     Check the authentication and authorization of the given user
     """
+    if rate_limiter.is_limited(request.remote_addr):
+        g.add_audit_event(event_type='rate-limited')
+        abort(429, description={'id': 'rate-limited'})
+
     # Get the bearer token, and check if it matches any accounts
     try:
         auth_header = request.headers['Authorization']
@@ -139,6 +194,7 @@ def check_auth():
         user = auth_mapping[token]
         g.user = user
     except KeyError:
+        rate_limiter.register_attempt(request.remote_addr)
         g.add_audit_event(event_type='unauthenticated')
         abort(401)
 

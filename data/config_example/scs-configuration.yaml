@@ -41,6 +41,7 @@ auth:
       whitelist:
       - 127.0.0.1/32
       - 172.16.134.0/24
+    max_auth_fails_per_15_min: 10
 
 extensions:
   constructors: []

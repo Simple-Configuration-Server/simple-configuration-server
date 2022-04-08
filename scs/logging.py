@@ -24,6 +24,12 @@ audit_events = {
         'level': logging.WARNING,
         'message_template': 'Unauthenticated request to {path} from {ip}',
     },
+    'rate-limited': {
+        'level': logging.WARNING,
+        'message_template': (
+            'Requests from {ip} are rate limited by the auth module'
+        )
+    },
     'unauthorized-ip': {
         'level': logging.WARNING,
         'message_template': "User '{user}' used from unauthorized IP {ip}",

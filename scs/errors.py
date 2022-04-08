@@ -44,6 +44,11 @@ definitions = {
             'This HTTP request method cannot be used on the endpoint'
         ),
     },
+    429: {
+        'rate-limited': (
+            'Rate limited due to too many false auth attempts from this ip'
+        ),
+    },
     500: {
         'internal-server-error': (
             'An internal server error occured'
