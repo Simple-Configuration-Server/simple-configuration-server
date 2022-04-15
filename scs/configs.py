@@ -4,12 +4,12 @@ Flask Blueprint containing the code for the configs/ endpoints, that loads the
 configuration data and returns the formatted data
 """
 from pathlib import Path
-from functools import partial
 import copy
 import logging
+import os
 
 from flask import (
-    Blueprint, request, g, make_response, abort, current_app
+    Blueprint, request, g, make_response, abort, current_app, Response
 )
 from flask.blueprints import BlueprintSetupState
 import fastjsonschema
@@ -70,7 +70,7 @@ def init(setup_state: BlueprintSetupState):
     check_templates = scs_config['templates']['validate_on_startup']
     default_rendering_options = scs_config['templates']['rendering_options']
     validate_dots = scs_config['environments']['reject_keys_containing_dots']
-    load_on_demand = not scs_config['environments']['cache']
+    enable_env_cache = scs_config['environments']['cache']
 
     _initialize_yaml_loaders(
         common_dir=common_basepath,
@@ -84,33 +84,6 @@ def init(setup_state: BlueprintSetupState):
 
     bp.template_folder = _config_basepath
 
-    relative_config_template_paths = _get_relative_config_template_paths()
-    for relative_url in relative_config_template_paths:
-        if load_on_demand:
-            envdata = None
-        else:
-            envdata = _load_env(relative_url.lstrip('/'))
-
-        bp.add_url_rule(
-            relative_url,
-            # Endpoint name must be unique, but  may not contain a dot
-            endpoint=relative_url.replace('.', '_'),
-            view_func=partial(
-                _view_config_file,
-                path=relative_url,
-                envdata=envdata
-            ),
-            methods=['GET', 'POST'],
-        )
-
-        if check_templates and not load_on_demand:
-            testenv = copy.deepcopy(envdata)
-            serialize_secrets(testenv)
-            template = setup_state.app.jinja_env.get_template(
-                relative_url.lstrip('/')
-            )
-            template.render(**testenv)
-
     for exc_class, error_id, error_msg in _EXCEPTIONS:
         errors.register_exception(
             exc_class, error_id,
@@ -118,6 +91,17 @@ def init(setup_state: BlueprintSetupState):
         )
     for audit_event_args in _AUDIT_EVENTS:
         register_audit_event(*audit_event_args)
+
+    if enable_env_cache or check_templates:
+        relative_config_template_paths = _get_relative_config_template_paths()
+        for relative_url in relative_config_template_paths:
+            env = _load_env(relative_url.lstrip('/'))
+            if check_templates:
+                serialize_secrets(env)
+                template = setup_state.app.jinja_env.get_template(
+                    relative_url.lstrip('/')
+                )
+                template.render(**env)
 
 
 def _initialize_yaml_loaders(
@@ -285,6 +269,25 @@ def _get_relative_config_template_paths() -> list[str]:
     return config_template_paths
 
 
+def _resource_exists(path: str) -> bool:
+    """
+    Checks if the given resource exists
+    """
+    # Prevent path traversal
+    # Note that this is later more extensively checked by the jinja loader
+    references_parent = any([p == os.path.pardir for p in path.split('/')])
+    if references_parent:
+        return False
+
+    # Prevent exposing env files
+    if path.endswith('scs-env.yaml'):
+        return False
+
+    full_path = Path(_config_basepath, path)
+
+    return full_path.is_file()
+
+
 # These seem to erroneously not be supported on the overlay function
 # https://github.com/pallets/jinja/issues/1645
 _MISSING_OVERLAY_OPTIONS = [
@@ -293,14 +296,15 @@ _MISSING_OVERLAY_OPTIONS = [
 ]
 
 
-def _view_config_file(path: str, envdata: dict):
+@bp.route('/<path:path>', methods=('GET', 'POST'))
+def _view_config_file(path: str) -> Response:
     """
     Flask view for the file at the given path, with the given envdata
     """
-    if envdata is None:
-        env = _load_env(path.lstrip('/'))
-    else:
-        env = copy.deepcopy(envdata)
+    if not _resource_exists(path):
+        abort(404)
+
+    env = _load_env(path)
 
     if request.method not in env['methods']:
         abort(405)

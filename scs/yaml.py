@@ -8,6 +8,7 @@ import re
 import os
 from pathlib import Path
 import secrets
+import copy
 
 from yaml import Loader, Node, SafeLoader, dump, safe_load
 
@@ -30,12 +31,14 @@ class _ParsedFileCache:
     def get_file(self, path: os.PathLike):
         if not self.disabled:
             abspath = Path(path).absolute().as_posix()
-            return self.cache.get(abspath)
+            data = self.cache.get(abspath)
+            if data is not None:
+                return copy.deepcopy(data)
 
     def add_file(self, path: os.PathLike, data):
         if not self.disabled:
             abspath = Path(path).absolute().as_posix()
-            self.cache[abspath] = data
+            self.cache[abspath] = copy.deepcopy(data)
 
     def disable(self):
         self.disabled = True
