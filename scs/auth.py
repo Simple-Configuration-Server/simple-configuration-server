@@ -7,27 +7,62 @@ from pathlib import Path
 import re
 import ipaddress
 import datetime
+import logging
 
 from flask import Blueprint, request, abort, g
 from flask.blueprints import BlueprintSetupState
 
 from .configs import serialize_secrets
-from . import yaml
+from . import yaml, errors
+from .logging import register_audit_event
 
 
 bp = Blueprint('auth', __name__)
 
-current_dir = Path(__file__).absolute().parent
+# Errors and audit events are registered with the errors and logging modules
+# respectively
+_ERRORS = [
+    (
+        429, 'auth-rate-limited',
+        'Rate limited due to too many false auth attempts from this ip',
+    ),
+    (
+        403, 'unauthorized-ip',
+        'You are not authorized to access the server from this IP',
+    ),
+    (
+        403, 'unauthorized-path',
+        'You are not authorized to access this path on the server',
+    ),
+]
+_AUDIT_EVENTS = [
+    (
+        'unauthenticated', logging.WARNING,
+        'Unauthenticated request to {path} from {ip}',
+    ),
+    (
+        'rate-limited', logging.WARNING,
+        'Requests from {ip} are rate limited by the auth module',
+    ),
+    (
+        'unauthorized-ip', logging.WARNING,
+        "User '{user}' used from unauthorized IP {ip}",
+    ),
+    (
+        'unauthorized-path', logging.WARNING,
+        "User '{user}' tried to access {path} but is not authorized",
+    ),
+]
 
 
-class SCSAuthFileLoader(yaml.SCSYamlLoader):
+class _SCSAuthFileLoader(yaml.SCSYamlLoader):
     """
     Loader for the auth configuration file
     """
     pass
 
 
-class RateLimiter:
+class _RateLimiter:
     """
     Tracks invalid authentication attempts for the current 15 minute interval
     and blacklists IPs when too many invalid authentication attempts were made.
@@ -83,7 +118,7 @@ def init(setup_state: BlueprintSetupState):
                 private_only: bool
                 ip_whitelist: list[str]
     """
-    global auth_mapping, rate_limiter
+    global _auth_mapping, _rate_limiter
 
     # Get options
     opts = setup_state.options
@@ -97,7 +132,7 @@ def init(setup_state: BlueprintSetupState):
     ]
 
     # Initialize the rate limiter
-    rate_limiter = RateLimiter(
+    _rate_limiter = _RateLimiter(
         max_auth_fails_per_15_min=max_auth_fails_per_15_min
     )
 
@@ -106,10 +141,10 @@ def init(setup_state: BlueprintSetupState):
         secrets_dir=secrets_dir,
         validate_dots=validate_dots
     )
-    SCSAuthFileLoader.add_constructor(
+    _SCSAuthFileLoader.add_constructor(
         secrets_constructor.tag, secrets_constructor.construct
     )
-    scs_auth = yaml.load_file(scs_auth_path, loader=SCSAuthFileLoader)
+    scs_auth = yaml.load_file(scs_auth_path, loader=_SCSAuthFileLoader)
     serialize_secrets(scs_auth)
 
     # Parse whitelisted IP ranges:
@@ -127,13 +162,13 @@ def init(setup_state: BlueprintSetupState):
                 )
 
     # Create the mapping
-    auth_mapping = {}
+    _auth_mapping = {}
     for user in scs_auth['users']:
-        auth_mapping[user.pop('token')] = user
+        _auth_mapping[user.pop('token')] = user
         parsed_whitelist = []
         for item in user['has_access']['from_networks']:
             network = ipaddress.ip_network(item)
-            if not is_whitelisted(network, parsed_global_whitelist):
+            if not _is_whitelisted(network, parsed_global_whitelist):
                 raise ValueError(
                     f"Network {str(network)} of user '{user['id']} "
                     "is not globally whitelisted!"
@@ -154,8 +189,13 @@ def init(setup_state: BlueprintSetupState):
             )
         user['has_access']['to_paths'] = parsed_allowed
 
+    for error_args in _ERRORS:
+        errors.register(*error_args)
+    for audit_event_args in _AUDIT_EVENTS:
+        register_audit_event(*audit_event_args)
 
-def is_whitelisted(
+
+def _is_whitelisted(
         network: ipaddress._BaseNetwork,
         whitelist: list[ipaddress._BaseNetwork]
         ) -> bool:
@@ -183,34 +223,32 @@ def check_auth():
     """
     Check the authentication and authorization of the given user
     """
-    if rate_limiter.is_limited(request.remote_addr):
+    if _rate_limiter.is_limited(request.remote_addr):
         g.add_audit_event(event_type='rate-limited')
-        abort(429, description={'id': 'rate-limited'})
+        abort(429, description={'id': 'auth-rate-limited'})
 
     # Get the bearer token, and check if it matches any accounts
     try:
         auth_header = request.headers['Authorization']
         token = auth_header.removeprefix('Bearer ')
-        user = auth_mapping[token]
-        g.user = user
+        user = _auth_mapping[token]
+        g.user_id = user['id']
     except KeyError:
-        rate_limiter.register_attempt(request.remote_addr)
+        _rate_limiter.register_attempt(request.remote_addr)
         g.add_audit_event(event_type='unauthenticated')
         abort(401)
 
     # User is authenticated. Now check (1) if the ip is in the whitelist, (2)
     # if the url is authorized
     user_ip = ipaddress.ip_network(request.remote_addr)
-    if not is_whitelisted(user_ip, user['has_access']['from_networks']):
-        event_type = 'unauthorized-ip'
-        g.add_audit_event(event_type=event_type)
-        abort(403, description={'id': event_type})
+    if not _is_whitelisted(user_ip, user['has_access']['from_networks']):
+        g.add_audit_event(event_type='unauthorized-ip')
+        abort(403, description={'id': 'unauthorized-ip'})
 
     # Check if the user is allowed to access the provided url
     for pattern in user['has_access']['to_paths']:
         if pattern.match(request.path):
             break
     else:
-        event_type = 'unauthorized-path'
-        g.add_audit_event(event_type=event_type)
-        abort(403, description={'id': event_type})
+        g.add_audit_event(event_type='unauthorized-path')
+        abort(403, description={'id': 'unauthorized-path'})

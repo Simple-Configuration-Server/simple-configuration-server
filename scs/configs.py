@@ -6,31 +6,42 @@ configuration data and returns the formatted data
 from pathlib import Path
 from functools import partial
 import copy
+import logging
 
 from flask import (
     Blueprint, request, g, make_response, abort, current_app
 )
 from flask.blueprints import BlueprintSetupState
 import fastjsonschema
+from jinja2 import TemplateError
+from yaml import YAMLError
 
-from . import yaml
+from . import yaml, errors
 from .tools import get_object_from_name
+from .logging import register_audit_event
 
 bp = Blueprint('configs', __name__, url_prefix='/configs')
 
-# Configure ninja2
-file_folder = Path(__file__).absolute().parent
-url_structure = {}
+# These are registered with the logging module in the init function
+_AUDIT_EVENTS = [
+    (
+        'config-loaded', logging.INFO,
+        "User '{user}' has loaded {path}",
+    ),
+    (
+        'secrets-loaded', logging.INFO,
+        "User '{user}' has loaded the following secrets: {secrets}",
+    ),
+]
 
-env_file_schema_path = Path(
+# Load the schema, and use this to populate the default values of the ENV
+_env_file_schema_path = Path(
     Path(__file__).absolute().parent,
     'schemas/scs-env.yaml'
 )
-env_file_schema = yaml.safe_load_file(env_file_schema_path)
-validate_env_file = fastjsonschema.compile(env_file_schema)
-
-# The default values are populsated from the JSON schema defaults
-DEFAULT_ENV = validate_env_file({})
+_env_file_schema = yaml.safe_load_file(_env_file_schema_path)
+_validate_env_file = fastjsonschema.compile(_env_file_schema)
+_DEFAULT_ENV = _validate_env_file({})
 
 
 @bp.record
@@ -48,11 +59,11 @@ def init(setup_state: BlueprintSetupState):
 
 
     """
-    global config_basepath, common_basepath, secrets_basepath
+    global _config_basepath
 
     scs_config = setup_state.app.config['SCS']
 
-    config_basepath = Path(scs_config['directories']['config']).absolute()
+    _config_basepath = Path(scs_config['directories']['config']).absolute()
     common_basepath = Path(scs_config['directories']['common']).absolute()
     secrets_basepath = Path(scs_config['directories']['secrets']).absolute()
     add_constructors = scs_config['extensions']['constructors']
@@ -71,21 +82,21 @@ def init(setup_state: BlueprintSetupState):
     # Configure template rendering options
     setup_state.app.jinja_options.update(default_rendering_options)
 
-    bp.template_folder = config_basepath
+    bp.template_folder = _config_basepath
 
-    relative_config_template_paths = get_relative_config_template_paths()
+    relative_config_template_paths = _get_relative_config_template_paths()
     for relative_url in relative_config_template_paths:
         if load_on_demand:
             envdata = None
         else:
-            envdata = load_env(relative_url.lstrip('/'))
+            envdata = _load_env(relative_url.lstrip('/'))
 
         bp.add_url_rule(
             relative_url,
             # Endpoint name must be unique, but  may not contain a dot
             endpoint=relative_url.replace('.', '_'),
             view_func=partial(
-                view_config_file,
+                _view_config_file,
                 path=relative_url,
                 envdata=envdata
             ),
@@ -99,6 +110,14 @@ def init(setup_state: BlueprintSetupState):
                 relative_url.lstrip('/')
             )
             template.render(**testenv)
+
+    for exc_class, error_id, error_msg in _EXCEPTIONS:
+        errors.register_exception(
+            exc_class, error_id,
+            message=error_msg
+        )
+    for audit_event_args in _AUDIT_EVENTS:
+        register_audit_event(*audit_event_args)
 
 
 def _initialize_yaml_loaders(
@@ -165,11 +184,11 @@ class EnvFileFormatException(Exception):
     """Raised if JSON schema validation fails on an env-file"""
 
 
-def load_env_file(relative_path: str) -> dict:
+def _load_env_file(relative_path: str) -> dict:
     """
     Load the data from the given env file, if it exists
     """
-    path = Path(config_basepath, relative_path)
+    path = Path(_config_basepath, relative_path)
     if not path.is_file():
         return {}
 
@@ -177,7 +196,7 @@ def load_env_file(relative_path: str) -> dict:
 
     try:
         # Ignore the return, since we don't want to fill defaults
-        validate_env_file(env_data)
+        _validate_env_file(env_data)
     except fastjsonschema.JsonSchemaValueException as e:
         raise EnvFileFormatException(
             f'The env file {path.as_posix()} failed validation: {e.message}'
@@ -186,7 +205,7 @@ def load_env_file(relative_path: str) -> dict:
     return env_data
 
 
-def get_env_file_hierarchy(relative_path: str) -> list[str]:
+def _get_env_file_hierarchy(relative_path: str) -> list[str]:
     """Gets all possible relative paths of env files"""
     path_parts = relative_path.split('/')
 
@@ -232,15 +251,15 @@ def serialize_secrets(data: dict | list) -> list[str]:
     return secret_ids
 
 
-def load_env(relative_path):
+def _load_env(relative_path):
     """
     Load the full environment for the given relative path
     """
-    combined_env = copy.deepcopy(DEFAULT_ENV)
-    rel_env_file_paths = get_env_file_hierarchy(relative_path)
+    combined_env = copy.deepcopy(_DEFAULT_ENV)
+    rel_env_file_paths = _get_env_file_hierarchy(relative_path)
 
     for rel_path in rel_env_file_paths:
-        data = load_env_file(rel_path)
+        data = _load_env_file(rel_path)
         for key, value in data.items():
             if isinstance(value, dict):
                 combined_env[key].update(value)
@@ -252,15 +271,15 @@ def load_env(relative_path):
     return combined_env
 
 
-def get_relative_config_template_paths() -> list[str]:
+def _get_relative_config_template_paths() -> list[str]:
     """
     Get the relative paths of all config templates
     """
     config_template_paths = []
-    for path in config_basepath.rglob('*'):
+    for path in _config_basepath.rglob('*'):
         if path.is_file() and not path.name.endswith('scs-env.yaml'):
             relative_template_path = \
-                path.as_posix().removeprefix(config_basepath.as_posix())
+                path.as_posix().removeprefix(_config_basepath.as_posix())
             config_template_paths.append(relative_template_path)
 
     return config_template_paths
@@ -268,22 +287,22 @@ def get_relative_config_template_paths() -> list[str]:
 
 # These seem to erroneously not be supported on the overlay function
 # https://github.com/pallets/jinja/issues/1645
-MISSING_OVERLAY_OPTIONS = [
+_MISSING_OVERLAY_OPTIONS = [
     'newline_sequence',
     'keep_trailing_newline'
 ]
 
 
-def view_config_file(path: str, envdata: dict):
+def _view_config_file(path: str, envdata: dict):
     """
     Flask view for the file at the given path, with the given envdata
     """
     if envdata is None:
-        env = load_env(path.lstrip('/'))
+        env = _load_env(path.lstrip('/'))
     else:
         env = copy.deepcopy(envdata)
 
-    if request.method not in envdata['methods']:
+    if request.method not in env['methods']:
         abort(405)
 
     if request.method == 'POST':
@@ -296,7 +315,7 @@ def view_config_file(path: str, envdata: dict):
         # applied later
         # https://github.com/pallets/jinja/issues/1645
         unsupported_options = {}
-        for key in MISSING_OVERLAY_OPTIONS:
+        for key in _MISSING_OVERLAY_OPTIONS:
             if key in rendering_options:
                 unsupported_options[key] = rendering_options.pop(key)
         jinja_env = current_app.jinja_env.overlay(**rendering_options)
@@ -320,3 +339,21 @@ def view_config_file(path: str, envdata: dict):
         )
 
     return response
+
+
+# These are registered with the 'errors' module, to ensure correct error
+# messages are returned if these occur
+_EXCEPTIONS = [
+    (
+        YAMLError, 'env-syntax-error',
+        'The YAML syntax in an env file could not be parsed',
+    ),
+    (
+        TemplateError, 'template-rendering-error',
+        'An error occured while trying to render the template',
+    ),
+    (
+        EnvFileFormatException, 'env-format-error',
+        'An env file was provided in an invalid format',
+    ),
+]

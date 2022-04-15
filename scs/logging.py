@@ -9,51 +9,52 @@ from logging import handlers
 import json
 import datetime
 from pathlib import Path
+import copy
 
 from flask import Blueprint, g, request
 from flask.blueprints import BlueprintSetupState
 from flask.logging import default_handler
 
+from .tools import get_referenced_fields
+
 bp = Blueprint('audit', __name__)
 
-audit_logger = logging.getLogger(__name__)
-audit_logger.propagate = False  # This will be a seperate log file
+_audit_logger = logging.getLogger(__name__)
+_audit_logger.propagate = False  # This will be a seperate log file
 
-audit_events = {
-    'unauthenticated': {
-        'level': logging.WARNING,
-        'message_template': 'Unauthenticated request to {path} from {ip}',
-    },
-    'rate-limited': {
-        'level': logging.WARNING,
-        'message_template': (
-            'Requests from {ip} are rate limited by the auth module'
+_audit_events = {}
+
+
+def register_audit_event(
+        type_: str, level: str | int, message_template: str
+        ):
+    """
+    Registers an audit event so it can be logged. After registration, you can
+    use the g.add_audit_event function, to add an audit event with the given
+    id
+
+    Args:
+        type_:
+            A unique identifier for the type of event to register
+        level:
+            The level at which this event should be logged (logging module
+            level)
+        message_template:
+            A template string,
+    """
+    if type_ in _audit_events:
+        raise ValueError(
+            f'CONFLICT: Audit event type {type_} is already registered'
         )
-    },
-    'unauthorized-ip': {
-        'level': logging.WARNING,
-        'message_template': "User '{user}' used from unauthorized IP {ip}",
-    },
-    'unauthorized-path': {
-        'level': logging.WARNING,
-        'message_template': (
-            "User '{user}' tried to access {path} but is not authorized"
-        )
-    },
-    'config-loaded': {
-        'level': logging.INFO,
-        'message_template': "User '{user}' has loaded {path}",
-    },
-    'secrets-loaded': {
-        'level': logging.INFO,
-        'message_template': (
-            "User '{user}' has loaded the following secrets: {secrets}"
-        ),
-    },
-}
+
+    _audit_events[type_] = {
+        'level': level,
+        'message_template': message_template,
+        'required_fields': get_referenced_fields(message_template),
+    }
 
 
-def configure_logger(
+def _configure_logger(
         logger: logging.Logger, settings: dict, formatter: logging.Formatter
         ):
     """
@@ -104,8 +105,8 @@ def init(setup_state: BlueprintSetupState):
         setup_state: The Flask BluePrint Setup State
     """
     audit_log_config = setup_state.app.config['SCS']['logs']['audit']
-    configure_logger(
-        audit_logger,
+    _configure_logger(
+        _audit_logger,
         audit_log_config,
         AuditLogFormatter(),
     )
@@ -113,16 +114,14 @@ def init(setup_state: BlueprintSetupState):
     app_log_config = setup_state.app.config['SCS']['logs']['application']
     app_logger = setup_state.app.logger
     app_logger.removeHandler(default_handler)
-    configure_logger(
+    _configure_logger(
         app_logger,
         app_log_config,
         AppLogFormatter(),
     )
 
 
-def add_audit_event(
-        *, event_type: str, secrets: list[str] = None
-        ):
+def _add_audit_event(event_type: str, **kwargs):
     """
     Add an audit event to the request context
     """
@@ -134,10 +133,28 @@ def add_audit_event(
         }
     }
 
-    if hasattr(g, 'user'):
-        event['details']['user'] = g.user['id']
-    if secrets is not None:
-        event['details']['secrets'] = secrets
+    required_fields = _audit_events[event_type]['required_fields']
+
+    if hasattr(g, 'user_id'):
+        event['details']['user'] = g.user_id
+    elif 'user' in required_fields:
+        # This occurs for audit events from the 'configs' blueprint, if
+        # a third party auth module is used that does not set the 'g.user_id'
+        # property
+        event['details']['user'] = None
+
+    event['details'].update(
+        copy.deepcopy(kwargs)
+    )
+
+    fields = set(event['details'].keys())
+    if (missing_fields := required_fields.difference(fields)):
+        # If this is not caught, an error is generated while buidling the
+        # log events, which is much harder to trace
+        raise ValueError(
+            f'The required fields {missing_fields} were not provided to the '
+            f'add_audit_event function for event type {event_type}'
+        )
 
     g.audit_events.append(event)
 
@@ -148,7 +165,7 @@ def init_events_function():
     Initializes the events for the global object, and adds the function
     """
     g.audit_events = []
-    g.add_audit_event = add_audit_event
+    g.add_audit_event = _add_audit_event
 
 
 @bp.after_app_request
@@ -157,12 +174,12 @@ def log_audit_event(response):
     Create a log entries in case audit requests are attached to the request
     """
     for event in g.audit_events:
-        event_properties = audit_events[event['type']]
+        event_properties = _audit_events[event['type']]
         level = event_properties['level']
         message = event_properties['message_template'].format(
             **event['details']
         )
-        audit_logger.log(level, message, extra={'audit_event': event})
+        _audit_logger.log(level, message, extra={'audit_event': event})
 
     return response
 
