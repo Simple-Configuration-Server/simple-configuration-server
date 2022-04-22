@@ -121,7 +121,7 @@ def init(setup_state: BlueprintSetupState):
                     whitelist: list[str]
                 max_auth_fails_per_15_min: bool
     """
-    global _auth_mapping, _rate_limiter
+    global _auth_mapping, _rate_limiter, _global_whitelist
 
     # Get options
     opts = setup_state.options
@@ -151,13 +151,13 @@ def init(setup_state: BlueprintSetupState):
     yaml.serialize_secrets(scs_users)
 
     # Parse whitelisted IP ranges:
-    parsed_global_whitelist = [
+    _global_whitelist = [
         ipaddress.ip_network(network) for network in network_whitelist
     ]
 
     # Check if these are all private
     if private_only:
-        for network in parsed_global_whitelist:
+        for network in _global_whitelist:
             if not network.is_private:
                 raise ValueError(
                     'private_only enabled, but globally whitelisted '
@@ -171,7 +171,7 @@ def init(setup_state: BlueprintSetupState):
         parsed_whitelist = []
         for item in user['has_access']['from_networks']:
             network = ipaddress.ip_network(item)
-            if not _is_whitelisted(network, parsed_global_whitelist):
+            if not _is_whitelisted(network, _global_whitelist):
                 raise ValueError(
                     f"Network {str(network)} of user '{user['id']} "
                     "is not globally whitelisted!"
@@ -227,6 +227,12 @@ def check_auth():
     Checks the authentication and authorization of users before the
     request
     """
+    user_ip = ipaddress.ip_network(request.remote_addr)
+    if not _is_whitelisted(user_ip, _global_whitelist):
+        # This check is added to prevent being able to spoof any IP
+        # address to circumvent the rate limiter.
+        abort(401)
+
     if _rate_limiter.is_limited(request.remote_addr):
         g.add_audit_event(event_type='rate-limited')
         abort(429, description={'id': 'auth-rate-limited'})
@@ -244,7 +250,6 @@ def check_auth():
 
     # User is authenticated. Now check (1) if the ip is in the whitelist, (2)
     # if the url is authorized
-    user_ip = ipaddress.ip_network(request.remote_addr)
     if not _is_whitelisted(user_ip, user['has_access']['from_networks']):
         g.add_audit_event(event_type='unauthorized-ip')
         abort(403, description={'id': 'unauthorized-ip'})
