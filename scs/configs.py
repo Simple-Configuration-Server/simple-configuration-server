@@ -290,6 +290,7 @@ def _resource_exists(path: str) -> bool:
 
 # These seem to erroneously not be supported on the overlay function
 # https://github.com/pallets/jinja/issues/1645
+# Test the removal of this after jinja2>=3.1.2 is released
 _MISSING_OVERLAY_OPTIONS = [
     'newline_sequence',
     'keep_trailing_newline'
@@ -318,6 +319,7 @@ def _view_config_file(path: str) -> Response:
         # Since some options seem to erroneously not be supported, these are
         # applied later
         # https://github.com/pallets/jinja/issues/1645
+        # Test the removal of this after jinja2>=3.1.2 is released
         unsupported_options = {}
         for key in _MISSING_OVERLAY_OPTIONS:
             if key in rendering_options:
