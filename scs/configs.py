@@ -72,7 +72,7 @@ def init(setup_state: BlueprintSetupState):
     validate_dots = scs_config['environments']['reject_keys_containing_dots']
     enable_env_cache = scs_config['environments']['cache']
 
-    _initialize_yaml_loaders(
+    _configure_yaml_loaders(
         common_dir=common_basepath,
         secrets_dir=secrets_basepath,
         add_constructors=add_constructors,
@@ -84,6 +84,10 @@ def init(setup_state: BlueprintSetupState):
 
     bp.template_folder = _config_basepath
 
+    # Register all exceptions and audit events with the errors and logging
+    # modules, to make sure pre-defined json messages are returned when errors
+    # occur, and specific audit events can be logged from within this
+    # bluetprint
     for exc_class, error_id, error_msg in _EXCEPTIONS:
         errors.register_exception(
             exc_class, error_id,
@@ -97,28 +101,33 @@ def init(setup_state: BlueprintSetupState):
         for relative_url in relative_config_template_paths:
             env = _load_env(relative_url.lstrip('/'))
             if check_templates:
-                serialize_secrets(env)
+                yaml.serialize_secrets(env)
                 template = setup_state.app.jinja_env.get_template(
                     relative_url.lstrip('/')
                 )
                 template.render(**env)
 
 
-def _initialize_yaml_loaders(
+def _configure_yaml_loaders(
         *, common_dir: Path, secrets_dir: Path, add_constructors: list[dict],
         validate_dots: bool,
         ):
     """
-    Initialize the loader with the right constructors
+    Configure the YAML loaders used by the configs module, to use the right
+    constructors for YAML tags
 
     Args:
-        common_dir: The base directory used to resolve !scs-common tags
+        common_dir:
+            The base directory used to resolve !scs-common tags
 
-        secrets_dir: The base directory used to resolve !scs-secret tags
+        secrets_dir:
+            The base directory used to resolve !scs-secret tags
 
-        add_constructors: List of custom constructers to add
+        add_constructors:
+            List of custom constructers to add on top of the default ones
 
-        validate_dots: Whether errors should be generated if dots are in keys
+        validate_dots:
+            Whether errors should be generated if dots are in keys
     """
     ENV_FILE_CONSTRUCTORS = [
         yaml.SCSRelativeConstructor(
@@ -171,6 +180,13 @@ class EnvFileFormatException(Exception):
 def _load_env_file(relative_path: str) -> dict:
     """
     Load the data from the given env file, if it exists
+
+    Args:
+        relative_path: The path of env file, relative to the config directory
+
+    Raises:
+        EnvFileFormatException in case the env file does not pass JSON-schema
+        validation
     """
     path = Path(_config_basepath, relative_path)
     if not path.is_file():
@@ -190,7 +206,18 @@ def _load_env_file(relative_path: str) -> dict:
 
 
 def _get_env_file_hierarchy(relative_path: str) -> list[str]:
-    """Gets all possible relative paths of env files"""
+    """
+    Get all possible paths of the env-files belonging to the file under the
+    given relative path
+
+    Args:
+        relative_path:
+            The path of the template to get the env files for, relative to the
+            config directory
+
+    Returns:
+        A list of the possible relative paths of scs-env files
+    """
     path_parts = relative_path.split('/')
 
     ordered_envfiles = ['scs-env.yaml']
@@ -203,41 +230,16 @@ def _get_env_file_hierarchy(relative_path: str) -> list[str]:
     return ordered_envfiles
 
 
-def serialize_secrets(data: dict | list) -> list[str]:
+def _load_env(relative_path: str):
     """
-    Serialize all secrets in the data
+    Load the combined env data for the template with the given relative_path
 
     Args:
-        env_data:
-            The environment data, possible containg SCSSecret objects. This
-            will be serialized IN PLACE
-
+        relative_path:
+            The path of the template, relative to the config directory
     Returns:
-        The id's of the secrets that were serialized
-    """
-    secret_ids = set()
-    if isinstance(data, list):
-        for i, item in enumerate(data):
-            if isinstance(item, yaml.SCSSecret):
-                secret_ids.add(item.id)
-                data[i] = item.value
-            else:
-                serialize_secrets(item)
-    elif isinstance(data, dict):
-        for key, value in data.items():
-            if isinstance(value, (dict, list)):
-                serialized_secrets = serialize_secrets(value)
-                secret_ids.update(serialized_secrets)
-            elif isinstance(value, yaml.SCSSecret):
-                secret_ids.add(value.id)
-                data[key] = value.value
-
-    return secret_ids
-
-
-def _load_env(relative_path):
-    """
-    Load the full environment for the given relative path
+        The combined environment data of all environment files applicable to
+        the template
     """
     combined_env = copy.deepcopy(_DEFAULT_ENV)
     rel_env_file_paths = _get_env_file_hierarchy(relative_path)
@@ -257,7 +259,11 @@ def _load_env(relative_path):
 
 def _get_relative_config_template_paths() -> list[str]:
     """
-    Get the relative paths of all config templates
+    Gets the relative paths of all config templates
+
+    Returns:
+        List of all relative paths of available templates under the config
+        directory
     """
     config_template_paths = []
     for path in _config_basepath.rglob('*'):
@@ -271,7 +277,14 @@ def _get_relative_config_template_paths() -> list[str]:
 
 def _resource_exists(path: str) -> bool:
     """
-    Checks if the given resource exists
+    Checks if a template exists that matches the given path
+
+    Args:
+        path: The path of the template
+
+    Returns:
+        True if the path is valid and the template exists. Otherwise returns
+        False
     """
     # Prevent path traversal
     # Note that this is later more extensively checked by the jinja loader
@@ -298,9 +311,21 @@ _MISSING_OVERLAY_OPTIONS = [
 
 
 @bp.route('/<path:path>', methods=('GET', 'POST'))
-def _view_config_file(path: str) -> Response:
+def view_config_file(path: str) -> Response:
     """
-    Flask view for the file at the given path, with the given envdata
+    Flask view function that returns the rendered template at the given path
+
+    Args:
+        path:
+            The path in the URL of the request, relative to the configs/
+            endpoint
+
+    Returns:
+        Flask response object containing the rendered template
+
+    Raises:
+        werkzeug.exceptions.HTTPException in case (1) an invalid path is
+        provided (404) or an unsupported method is used (405)
     """
     if not _resource_exists(path):
         abort(404)
@@ -313,7 +338,7 @@ def _view_config_file(path: str) -> Response:
     if request.method == 'POST':
         env['context'].update(request.get_json(force=True))
 
-    secret_ids = serialize_secrets(env)
+    secret_ids = yaml.serialize_secrets(env)
 
     if rendering_options := env['rendering_options']:
         # Since some options seem to erroneously not be supported, these are

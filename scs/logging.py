@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Contains the configuration related to creating audit logs. Audit logs record
-actions related to authentication and retrieving information. For all possible
-events, see the 'events' variable below.
+Module that configures the logging of SCS. It configures seperate logs for
+'audit' events and for the Flask application logs.
+
+To log audit events from 3rd party blueprints, first register the audit events
+used by the blueprint on init, using the 'register_audit_event' function. For
+each request, blueprints can access the g.add_audit_event function to add an
+audit event. All events are logged when the request is completed.
 """
 import logging
 from logging import handlers
@@ -11,7 +15,7 @@ import datetime
 from pathlib import Path
 import copy
 
-from flask import Blueprint, g, request
+from flask import Blueprint, g, request, Response
 from flask.blueprints import BlueprintSetupState
 from flask.logging import default_handler
 
@@ -19,9 +23,10 @@ from .tools import get_referenced_fields
 
 bp = Blueprint('audit', __name__)
 
-_audit_logger = logging.getLogger(__name__)
+_audit_logger = logging.getLogger('audit')
 _audit_logger.propagate = False  # This will be a seperate log file
 
+# This is filled by the register_audit_event() function
 _audit_events = {}
 
 
@@ -40,7 +45,13 @@ def register_audit_event(
             The level at which this event should be logged (logging module
             level)
         message_template:
-            A template string,
+            A template string that can use any of the variables in the event
+            details. These at least contain the 'ip' of the requester, and the
+            'path' that is requested. See _add_audit_event function for
+            available variables.
+
+    Raises:
+        ValueError in case the given type_ is already registered
     """
     if type_ in _audit_events:
         raise ValueError(
@@ -59,6 +70,15 @@ def _configure_logger(
         ):
     """
     Apply the settings from the SCS configuration file to the provided logger
+
+    Args:
+        logger:
+            The logger to configure
+        settings:
+            The settings for the logger, as defined in the scs-configuration
+            file
+        formatter:
+            Formatter to attach to the configured handler
     """
     numeric_levels = []
     if 'stdout' in settings:
@@ -99,7 +119,7 @@ def _configure_logger(
 @bp.record
 def init(setup_state: BlueprintSetupState):
     """
-    Initialize the audit module logging
+    Initialize the logging module
 
     Args:
         setup_state: The Flask BluePrint Setup State
@@ -126,6 +146,15 @@ def init(setup_state: BlueprintSetupState):
 def _add_audit_event(event_type: str, **kwargs):
     """
     Add an audit event to the request context
+
+    Args:
+        event_type:
+            Unique identifier for the audit event to add. This type needs to be
+            registered using the register_audit_event() function, prior to
+            using it.
+        **kwargs:
+            These are added as 'details' to the logged event, and can therefore
+            be referenced from a message template
     """
     event = {
         'type': event_type,
@@ -164,16 +193,23 @@ def _add_audit_event(event_type: str, **kwargs):
 @bp.before_app_request
 def init_events_function():
     """
-    Initializes the events for the global object, and adds the function
+    Before every request, initialize the events on the global object, and
+    register the add_audit_event function
     """
     g.audit_events = []
     g.add_audit_event = _add_audit_event
 
 
 @bp.after_app_request
-def log_audit_event(response):
+def log_audit_event(response: Response) -> Response:
     """
-    Create a log entries in case audit requests are attached to the request
+    Create a log entries in case audit events were added during the request
+
+    Args:
+        response: The flask response (passed-through)
+
+    Returns:
+        The Flask response, passed through from the input parameter
     """
     for event in g.audit_events:
         event_properties = _audit_events[event['type']]
@@ -188,7 +224,7 @@ def log_audit_event(response):
 
 class AuditLogFormatter(logging.Formatter):
     """
-    Formatter for creating JSON lines log files for the Audit Logs, so they
+    Formatter for creating JSON-lines log files for the Audit Logs, so they
     can be streamed to a monitoring system
 
     Attributes:
@@ -201,9 +237,8 @@ class AuditLogFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """
-        Format a log record to the json format
+        Returns the relevant data from the LogRecored, formatted as JSON (str)
         """
-
         payload = {
             'level': record.levelname,
             'date': datetime.datetime.utcfromtimestamp(
@@ -232,7 +267,7 @@ class AppLogFormatter(logging.Formatter):
     def get_error_info(self, record: logging.LogRecord) -> str:
         """
         Gets an error information string, if an error has occured, otherwise
-        returns None. Code partially from logging.Formatter
+        returns None. Code partially from python builtin logging.Formatter
         """
         s = ' '
         if record.exc_info:
@@ -256,11 +291,12 @@ class AppLogFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """
-        Format a log record to the json format
+        Returns the relevant data from the LogRecored, formatted as JSON (str)
         """
         err = record.exc_info
         if err is False or err is True:
-            # This is somehow the case for some elasticsearch package errors..
+            # This is the case for some 3rd party package errors
+            # (e.g. elasticsearch)
             error_type = None
         elif err is not None:
             error_type = record.exc_info[0].__name__

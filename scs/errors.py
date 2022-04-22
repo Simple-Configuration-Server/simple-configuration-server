@@ -1,10 +1,14 @@
 # -*- coding; utf-8 -*-
 """
-Flask Blueprint that contains the custom error handlers for SCS
+Flask Blueprint that contains the custom error handlers for SCS, making sure
+that machine interpretable JSON responses are returned in case of errors.
+
+Use the register() and register_exception() functions to configure the errors
+module to respond with custom errors for your blueprints.
 """
 import re
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, Response
 from werkzeug.exceptions import HTTPException
 
 bp = Blueprint('errors', __name__)
@@ -14,7 +18,8 @@ _non_word_chars_regex = re.compile(r'\W+')
 # Error definitions are stored in the below variable. More can be added using
 # the .register function. Note that, if an 'id' is not supplied to the abort
 # function, the first key is used by default. If the code is not in this
-# variable, the json_error_response function will generate a format
+# variable, the json_error_response function will generate a JSON response from
+# the default exception name and description of flask
 _definitions = {
     400: {
         'bad-request': (
@@ -88,7 +93,9 @@ def register_exception(
             the given id should be returned
         id_:
             An error id, already registered for code 500 using the
-            register_error function
+            register_error function. Alternatively, if the 'message' parameter
+            is provided, it will be registered as an error for the 500 status
+            code
         message:
             When provided, the combination of the given id is also registered
             as an error for the 500 status code ()
@@ -111,8 +118,18 @@ def register_exception(
     _exception_ids.append((exception_class, id_))
 
 
-def _error_response(code, id_, message):
-    """Return a SCS error response"""
+def _error_response(code: int, id_: str, message: str) -> tuple[Response, int]:
+    """
+    Returns an SCS error response
+
+    Args:
+        code: Status code to return
+        id_: Error id to return
+        message: Error message to return
+
+    Returns:
+        The Flask response from the jsonify function and the response code
+    """
     return jsonify({
         'error': {
             'id': id_,
@@ -121,9 +138,9 @@ def _error_response(code, id_, message):
     }), code
 
 
-def _get_500_error_id(error):
+def _get_500_error_id(error: Exception) -> str:
     """
-    Get the ID for a 500 error
+    Returns the error id to use for the given exception
     """
     id_ = next(iter(_definitions[500].keys()))
     for exception_cls, error_id in _exception_ids:
@@ -135,16 +152,31 @@ def _get_500_error_id(error):
 
 
 @bp.app_errorhandler(HTTPException)
-def json_error_response(e):
+def json_error_response(e) -> tuple[Response, int]:
+    """
+    Application-wide error handler to generate a JSON response in case of
+    errors
+
+    Args:
+        e: The exception that triggered the handler
+
+    Returns:
+        The JSON response and status code to respond with to the user
+    """
     if e.code == 500:
         id_ = _get_500_error_id(e)
         message = _definitions[e.code][id_]
     elif e.code in _definitions:
+        # By default, use the first error id that is configured. If the
+        # description object contains an 'id' key, that id will be used if
+        # available
         id_ = next(iter(_definitions[e.code].keys()))
         if isinstance(e.description, dict):
             id_ = e.description.get('id', id_)
         message = _definitions[e.code][id_]
     else:
+        # In case no definition is given, the original error name is converted
+        # to an id, and the description is used as the message
         id_ = _non_word_chars_regex.sub('-', e.name.lower())
         message = e.description
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Contains the built-in YAML tag constructors for the SCS
+Contains the built-in YAML Loaders, loading functions, and constructors. A
+file cache is implemented to cache loaded content when required.
 """
 from abc import ABC, abstractmethod
 from typing import Any
@@ -13,34 +14,44 @@ import copy
 from yaml import Loader, Node, SafeLoader, dump, safe_load
 
 
-index_regex = re.compile(r'\[(\d+)\]')
-
-
 class _ParsedFileCache:
     """
-    Object to store the parsed contents of a YAML file during the construction
-    of envdata for each path
+    Object to store parsed contents of YAML files. If enabled, this means
+    YAML files only have to be loaded and parsed once. Use the disable() method
+    to disable the caching of YAML files
     """
     def __init__(self):
-        self.cache = {}
+        self._cache = {}
         self.disabled = False
 
     def clear(self):
-        self.cache = {}
+        """Clears the parsed file cache"""
+        self._cache = {}
 
-    def get_file(self, path: os.PathLike):
+    def get_file(self, path: os.PathLike) -> Any:
+        """
+        Get the contents of the file with the given path from the cache
+        """
         if not self.disabled:
             abspath = Path(path).absolute().as_posix()
-            data = self.cache.get(abspath)
+            data = self._cache.get(abspath)
             if data is not None:
                 return copy.deepcopy(data)
 
     def add_file(self, path: os.PathLike, data):
+        """
+        Adds the parsed data (contents) of the file at the given file path to
+        the cache
+        """
         if not self.disabled:
             abspath = Path(path).absolute().as_posix()
-            self.cache[abspath] = copy.deepcopy(data)
+            self._cache[abspath] = copy.deepcopy(data)
 
     def disable(self):
+        """
+        Disables the cache
+        """
+        self.clear()
         self.disabled = True
 
 
@@ -50,15 +61,21 @@ filecache = _ParsedFileCache()
 class SCSYamlTagConstructor(ABC):
     """
     Base class for YAML tag constructors
+
+    Any constructors configured under extensions.constructors in the
+    scs-configuration file should inherit from this class
     """
     @property
     @abstractmethod
-    def tag(self):
+    def tag(self) -> str:
         """The yaml tag to register the constructor for"""
         pass
 
     @abstractmethod
     def construct(self, loader: Loader, node: Node) -> Any:
+        """
+        Constructor method to construct the contents a node with the given tag
+        """
         pass
 
 
@@ -93,9 +110,17 @@ class SCSEnvFileLoader(SCSYamlLoader):
     pass
 
 
-def load_file(path: Path, loader: SCSYamlLoader) -> Any:
+def load_file(path: Path, loader: type) -> Any:
     """
     Load data from the given path, using the provided loader
+
+    Args:
+        path: The path of the yaml file to load
+
+        loader: A loader class that inherits from SCSYamlLoader
+
+    Returns:
+        The data loaded from the YAML file
     """
     path = path.absolute()
     if (data := filecache.get_file(path)) is not None:
@@ -117,6 +142,12 @@ def load_file(path: Path, loader: SCSYamlLoader) -> Any:
 def safe_load_file(path: Path) -> Any:
     """
     Use the default pyyaml SafeLoader to load a file (uncached)
+
+    Args:
+        path: The full path of the YAML file
+
+    Returns:
+        The parsed contents of the given YAML file
     """
     with open(path, 'r', encoding='utf8') as yamlfile:
         return safe_load(yamlfile)
@@ -131,9 +162,12 @@ class RelativePathMixin:
             Whether to validate that there are no dots in the key names, since
             these are unusable for references
     """
+    # Regex to match a list index inside a scs-ref tag contents
+    index_regex = re.compile(r'\[(\d+)\]')
+
     @property
     @abstractmethod
-    def loader(self):
+    def loader(self) -> type:
         """The Loader Class (NOT: instance) to use"""
         pass
 
@@ -142,6 +176,18 @@ class RelativePathMixin:
         super().__init__(*args, **kwargs)
 
     def _get_data(self, base_dir: Path, ref: str) -> Any:
+        """
+        Get the data from the referenced location and attribute
+
+        Args:
+            base_dir:
+                The directory the reference is relative to
+            ref:
+                The reference given in the YAML file
+
+        Returns:
+            The data that's loaded from the referenced location
+        """
         # Split the reference to (1) file path, (2) a property in a file (when
         # present)
         ref_parts = ref.split('#')
@@ -152,7 +198,6 @@ class RelativePathMixin:
         else:
             file_path, attribute_loc = ref_parts
 
-        # Resolve full path
         file_path = Path(base_dir, file_path)
 
         file_data = load_file(file_path, loader=self.loader)
@@ -168,7 +213,7 @@ class RelativePathMixin:
             loc_levels = attribute_loc.split('.')
             level_data = file_data
             for level in loc_levels:
-                if match := index_regex.match(level):
+                if match := self.index_regex.match(level):
                     index = int(match.group(1))
                     level_data = level_data[index]
                 else:
@@ -205,24 +250,59 @@ class RelativePathMixin:
 class SCSSecret:
     """
     A secret class, used to track which secrets end-up in the final Env, so
-    secret access can be logged.
+    secret access can be logged
 
     Attributes:
         id:
             A unique identifier describing the secrets. This will be logged in
-            the access logs
+            the audit logs
         value:
             The value of the secret
     """
-    def __init__(self, id_: str, value):
+    def __init__(self, id_: str, value: Any):
         self.id = id_
         self.value = value
+
+
+def serialize_secrets(data: dict | list) -> list[str]:
+    """
+    Serialize all secrets in the data (In-place)
+
+    Args:
+        env_data:
+            The environment data, possible containg SCSSecret objects. This
+            will be serialized IN PLACE
+
+    Returns:
+        The id's of the secrets that were serialized
+    """
+    secret_ids = set()
+    if isinstance(data, list):
+        for i, item in enumerate(data):
+            if isinstance(item, SCSSecret):
+                secret_ids.add(item.id)
+                data[i] = item.value
+            else:
+                serialize_secrets(item)
+    elif isinstance(data, dict):
+        for key, value in data.items():
+            if isinstance(value, (dict, list)):
+                serialized_secrets = serialize_secrets(value)
+                secret_ids.update(serialized_secrets)
+            elif isinstance(value, SCSSecret):
+                secret_ids.add(value.id)
+                data[key] = value.value
+
+    return secret_ids
 
 
 # The default constructors used by SCS
 class SCSSecretConstructor(SCSYamlTagConstructor, RelativePathMixin):
     """
     The default constructor for the 'scs-secret' tag
+
+    Attributes:
+        secrets_dir: The directory containing the yaml files with secrets
     """
     tag = '!scs-secret'
     loader = SCSSecretFileLoader
@@ -242,6 +322,9 @@ class SCSSecretConstructor(SCSYamlTagConstructor, RelativePathMixin):
 class SCSCommonConstructor(SCSYamlTagConstructor, RelativePathMixin):
     """
     The default constructor for the 'scs-common' tag
+
+    Attributes:
+        common_dir: The directory containing the yaml files with common data
     """
     tag = '!scs-common'
     loader = SCSEnvFileLoader
@@ -271,14 +354,23 @@ class SCSRelativeConstructor(SCSYamlTagConstructor, RelativePathMixin):
 
 class SCSExpandEnvConstructor(SCSYamlTagConstructor):
     """
-    The default constructor for the 'scs-relative' tag
+    The default constructor for the 'scs-expand-env' tag
     """
     tag = '!scs-expand-env'
     pattern = re.compile(r'\$\{([^}^{]+)\}')
 
-    def _get_env_var(self, match):
+    def _get_env_var(self, match: re.Match) -> str:
         """
         Return the environment variable for the 'pattern' match
+
+        Args:
+            match: A match to the SCSExpandEnvConstructor.pattern
+
+        Returns:
+            The contents of the environment variable
+
+        Raises:
+            KeyError in case the parsed environment variable does not exist
         """
         env_var_name = match.group(1)
         try:

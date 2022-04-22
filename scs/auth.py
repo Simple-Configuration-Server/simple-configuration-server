@@ -12,7 +12,6 @@ import logging
 from flask import Blueprint, request, abort, g
 from flask.blueprints import BlueprintSetupState
 
-from .configs import serialize_secrets
 from . import yaml, errors
 from .logging import register_audit_event
 
@@ -108,15 +107,19 @@ class _RateLimiter:
 @bp.record
 def init(setup_state: BlueprintSetupState):
     """
-    Initializes the authentication module by loading the configuration files
+    Initializes the authentication module and loads the user data
 
     Args:
         setup_state:
             The .options attribute (options parameter passed to
             register_blueprint) should be a dict with the key/value pairs:
-                scs_auth_path: pathlib.Path
-                private_only: bool
-                ip_whitelist: list[str]
+                users_file: pathlib.Path
+                directories: dict
+                    secrets: string
+                networks: dict
+                    private_only: bool
+                    whitelist: list[str]
+                max_auth_fails_per_15_min: bool
     """
     global _auth_mapping, _rate_limiter
 
@@ -136,7 +139,7 @@ def init(setup_state: BlueprintSetupState):
         max_auth_fails_per_15_min=max_auth_fails_per_15_min
     )
 
-    # Load the scs_auth.yaml file
+    # Load the scs-ursers.yaml file
     secrets_constructor = yaml.SCSSecretConstructor(
         secrets_dir=secrets_dir,
         validate_dots=validate_dots
@@ -145,7 +148,7 @@ def init(setup_state: BlueprintSetupState):
         secrets_constructor.tag, secrets_constructor.construct
     )
     scs_users = yaml.load_file(users_file_path, loader=_SCSUsersFileLoader)
-    serialize_secrets(scs_users)
+    yaml.serialize_secrets(scs_users)
 
     # Parse whitelisted IP ranges:
     parsed_global_whitelist = [
@@ -221,7 +224,8 @@ def _is_whitelisted(
 @bp.before_app_request
 def check_auth():
     """
-    Check the authentication and authorization of the given user
+    Checks the authentication and authorization of users before the
+    request
     """
     if _rate_limiter.is_limited(request.remote_addr):
         g.add_audit_event(event_type='rate-limited')

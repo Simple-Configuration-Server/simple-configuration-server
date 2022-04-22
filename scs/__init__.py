@@ -22,13 +22,12 @@ def create_app() -> Flask:
     Returns:
         The main flask application
     """
-    # create and configure the app
     app = Flask(__name__)
 
     configuration = load_application_configuration()
 
     # The auth configuration is passed to the blueprint directly
-    # and not available on the global configuration object
+    # and not available under the app,config attribute
     auth_config = configuration.pop('auth')
 
     app.config['SCS'] = configuration
@@ -44,7 +43,7 @@ def create_app() -> Flask:
     app.register_blueprint(errors.bp)
     app.register_blueprint(configs.bp)
 
-    # Register auth Blueprint, and pass
+    # Dynamically Register auth blueprint, and pass the auth config options
     auth_module = importlib.import_module(auth_config['module'])
     app.register_blueprint(
         auth_module.bp,
@@ -60,18 +59,12 @@ def create_app() -> Flask:
     for jinja_extension in configuration['extensions']['jinja2']:
         app.jinja_env.add_extension(jinja_extension['name'])
 
-    # Clear the cache that was used to load all files
-    yaml.filecache.clear()
-
     return app
 
 
 def load_application_configuration() -> dict:
     """
-    Loads the main SCS configuratoin file
-
-    Args:
-        path: The path to the configuration file
+    Loads the main SCS configuration file
 
     Returns:
         The configuration file data
