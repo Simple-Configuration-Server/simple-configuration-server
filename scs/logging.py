@@ -104,11 +104,13 @@ def init(setup_state: BlueprintSetupState):
     Args:
         setup_state: The Flask BluePrint Setup State
     """
+    source_name = setup_state.app.config['SCS']['logs']['source_name']
+
     audit_log_config = setup_state.app.config['SCS']['logs']['audit']
     _configure_logger(
         _audit_logger,
         audit_log_config,
-        AuditLogFormatter(),
+        AuditLogFormatter(source_name=source_name),
     )
 
     app_log_config = setup_state.app.config['SCS']['logs']['application']
@@ -117,7 +119,7 @@ def init(setup_state: BlueprintSetupState):
     _configure_logger(
         app_logger,
         app_log_config,
-        AppLogFormatter(),
+        AppLogFormatter(source_name=source_name),
     )
 
 
@@ -189,10 +191,13 @@ class AuditLogFormatter(logging.Formatter):
     Formatter for creating JSON lines log files for the Audit Logs, so they
     can be streamed to a monitoring system
 
-    Arguments:
-        log_source_name --- str: The name if the script that is being logged
+    Attributes:
+        source_name:
+            The value of the 'source' key for each log event
     """
-    source_name = 'scs'
+    def __init__(self, *args, source_name: str, **kwargs):
+        self.source_name = source_name
+        super().__init__(*args, **kwargs)
 
     def format(self, record: logging.LogRecord) -> str:
         """
@@ -215,8 +220,14 @@ class AuditLogFormatter(logging.Formatter):
 class AppLogFormatter(logging.Formatter):
     """
     Formatter for creating application logs in JSON-lines format
+
+    Attributes:
+        source_name:
+            The value of the 'source' key for each log event
     """
-    source_name = 'scs'
+    def __init__(self, *args, source_name: str, **kwargs):
+        self.source_name = source_name
+        super().__init__(*args, **kwargs)
 
     def get_error_info(self, record: logging.LogRecord) -> str:
         """

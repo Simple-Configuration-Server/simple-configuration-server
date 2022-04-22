@@ -168,6 +168,13 @@ properties:
             properties:
               level: *level-setting
       application: *log-configuration
+      source_name:
+        type: string
+        default: scs
+        description:
+          The value of the 'source' key in the logs. Change this if you
+          want to be able to identify different instances of SCS in your
+          log centralization system.
   
 
   auth:
