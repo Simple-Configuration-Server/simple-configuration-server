@@ -55,7 +55,7 @@ _AUDIT_EVENTS = [
 ]
 
 
-class _SCSAuthFileLoader(yaml.SCSYamlLoader):
+class _SCSUsersFileLoader(yaml.SCSYamlLoader):
     """
     Loader for the auth configuration file
     """
@@ -122,7 +122,7 @@ def init(setup_state: BlueprintSetupState):
 
     # Get options
     opts = setup_state.options
-    scs_auth_path = Path(opts['users_file'])
+    users_file_path = Path(opts['users_file'])
     private_only = opts['networks']['private_only']
     network_whitelist = opts['networks']['whitelist']
     secrets_dir = opts['directories']['secrets']
@@ -141,11 +141,11 @@ def init(setup_state: BlueprintSetupState):
         secrets_dir=secrets_dir,
         validate_dots=validate_dots
     )
-    _SCSAuthFileLoader.add_constructor(
+    _SCSUsersFileLoader.add_constructor(
         secrets_constructor.tag, secrets_constructor.construct
     )
-    scs_auth = yaml.load_file(scs_auth_path, loader=_SCSAuthFileLoader)
-    serialize_secrets(scs_auth)
+    scs_users = yaml.load_file(users_file_path, loader=_SCSUsersFileLoader)
+    serialize_secrets(scs_users)
 
     # Parse whitelisted IP ranges:
     parsed_global_whitelist = [
@@ -163,7 +163,7 @@ def init(setup_state: BlueprintSetupState):
 
     # Create the mapping
     _auth_mapping = {}
-    for user in scs_auth['users']:
+    for user in scs_users['users']:
         _auth_mapping[user.pop('token')] = user
         parsed_whitelist = []
         for item in user['has_access']['from_networks']:
