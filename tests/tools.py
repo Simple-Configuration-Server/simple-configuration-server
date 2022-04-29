@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 import os
 import sys
+import json
 
 from werkzeug.test import Client
 
@@ -35,3 +36,15 @@ def get_test_client(config_dir: Path) -> Client:
     app = create_app()
     app.testing = True
     return app.test_client()
+
+
+def load_jsonlines_file(path: Path) -> list:
+    """
+    Load the lines of a JSON-lines file
+    """
+    lines = []
+    with open(path, 'r', encoding='utf8') as jsonlinesfile:
+        for line in jsonlinesfile:
+            lines.append(json.loads(line))
+
+    return lines
