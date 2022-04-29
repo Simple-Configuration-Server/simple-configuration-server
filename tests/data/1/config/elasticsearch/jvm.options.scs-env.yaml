@@ -1,5 +1,0 @@
-context:
-  jvm_heap: !scs-common 'common-vars.yaml#elasticsearch.jvm-heap'
-
-headers:
-  Content-Type: text/plain

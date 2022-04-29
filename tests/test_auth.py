@@ -3,29 +3,13 @@
 Tests for the scs.auth module
 """
 from pathlib import Path
-import os
-import sys
 import tools
 
-tests_path = Path(__file__).parent.absolute()
-
-sys.path.append(
-    Path(tests_path, '../').absolute().as_posix()
-)
-
-from scs import create_app  # noqa: E402
-
-os.environ['SCS_CONFIG_DIR'] = Path(
-    tests_path,
-    'data/1'
-).as_posix()
-
-app = create_app()
-app.testing = True
-client = app.test_client()
-
+file_dir = Path(__file__).parent.absolute()
+config_dir = Path(file_dir, 'data/1')
+client = tools.get_test_client(config_dir)
 tokens = tools.safe_load_yaml_file(
-    Path(tests_path, 'data/1/secrets/scs-tokens.yaml')
+    Path(file_dir, 'data/1/secrets/scs-tokens.yaml')
 )
 
 

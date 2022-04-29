@@ -20,7 +20,7 @@ logs:
   #     backup_count: 5
   #     level: INFO
     stdout:
-      level: INFO
+      level: CRITICAL
   application:
     # file:
     #   path: /var/log/scs/app.log.jsonl
@@ -28,7 +28,7 @@ logs:
     #   backup_count: 5
     #   level: INFO
     stdout:
-      level: INFO
+      level: CRITICAL
 
 auth:
   module: scs.auth

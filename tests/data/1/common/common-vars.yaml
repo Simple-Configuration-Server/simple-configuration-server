@@ -1,7 +1,7 @@
 elasticsearch:
   jvm-heap: "2g"
   port: 9200
-  cluster_name: 'opendal-production'
+  cluster_name: 'scs-production'
 hosts:
   - 127.0.0.1
   - 192.168.1.1

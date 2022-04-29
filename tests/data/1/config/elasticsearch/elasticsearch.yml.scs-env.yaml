@@ -4,7 +4,7 @@ context:
   http_port: !scs-common 'common-vars.yaml#elasticsearch.port'
   node_name: "main ES host"
   password: !scs-secret 'es_secrets.yaml#password'
-  heap: !scs-relative 'jvm.options.scs-env.yaml#context.jvm_heap'
+  heap: !scs-relative 'heap_size.scs-env.yaml#context.heap'
 headers:
   Content-Type: 'application/x-yaml'
 methods:
