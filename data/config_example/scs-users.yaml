@@ -1,8 +1,0 @@
-users:
-  - id: scs-demonstration
-    token: !scs-secret 'scs-tokens.yaml#staging-server'
-    has_access:
-      to_paths:
-        - /configs/elasticsearch/*
-      from_networks:
-        - 127.0.0.1
