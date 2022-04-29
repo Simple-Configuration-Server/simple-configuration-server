@@ -5,6 +5,7 @@ Tests for the scs.auth module
 from pathlib import Path
 import os
 import sys
+import tools
 
 tests_path = Path(__file__).parent.absolute()
 
@@ -23,6 +24,10 @@ app = create_app()
 app.testing = True
 client = app.test_client()
 
+tokens = tools.safe_load_yaml_file(
+    Path(tests_path, 'data/1/secrets/scs-tokens.yaml')
+)
+
 
 def test_if_user_authenticates():
     """
@@ -32,7 +37,7 @@ def test_if_user_authenticates():
         '/configs/elasticsearch/elasticsearch.yml',
         headers={
             'Authorization': (
-                'Bearer K27HUC-0geVXv0Aq6wXCq4tilJvImP3_Rx3MGrwbC9g'
+                f"Bearer {tokens['test-user']}"
             ),
         },
         environ_base={'REMOTE_ADDR': '127.0.0.1'},
@@ -54,7 +59,7 @@ def test_wrong_credentials_and_limiting():
             '/configs/elasticsearch/elasticsearch.yml',
             headers={
                 'Authorization': (
-                    'Bearer K27HUC-0geVXv0Aq6wXCq4tilJvImP3_Rx3MGddbC9g'
+                    'Bearer WrongBearerToken'
                 ),
             },
             environ_base={'REMOTE_ADDR': '127.0.0.1'},
@@ -74,7 +79,7 @@ def test_path_access_denied():
         '/configs/host-name',
         headers={
             'Authorization': (
-                'Bearer K27HUC-0geVXv0Aq6wXCq4tilJvImP3_Rx3MGrwbC9g'
+                f"Bearer {tokens['test-user']}"
             ),
         },
         environ_base={'REMOTE_ADDR': '192.168.1.34'}
@@ -86,7 +91,7 @@ def test_path_access_denied():
         '/configs/host-name',
         headers={
             'Authorization': (
-                'Bearer gYOWKAcNIu42rg1Fajw3RwKrFNDK9aObVVA1hhk2gLA'
+                f"Bearer {tokens['test-user-2']}"
             ),
         },
         environ_base={'REMOTE_ADDR': '192.168.1.34'}
@@ -103,7 +108,7 @@ def test_global_whitelisted_but_not_user_whitelisted():
         '/configs/elasticsearch/elasticsearch.yml',
         headers={
             'Authorization': (
-                'Bearer K27HUC-0geVXv0Aq6wXCq4tilJvImP3_Rx3MGrwbC9g'
+                f"Bearer {tokens['test-user']}"
             ),
         },
         environ_base={'REMOTE_ADDR': '192.168.1.2'}
@@ -121,7 +126,7 @@ def test_not_globally_whitelisted():
         '/configs/elasticsearch/elasticsearch.yml',
         headers={
             'Authorization': (
-                'Bearer K27HUC-0geVXv0Aq6wXCq4tilJvImP3_Rx3MGrwbC9g'
+                f"Bearer {tokens['test-user']}"
             ),
         },
         environ_base={'REMOTE_ADDR': '172.16.94.2'}
