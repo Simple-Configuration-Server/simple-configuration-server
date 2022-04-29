@@ -1,0 +1,78 @@
+directories:
+  common: !scs-expand-env ${SCS_CONFIG_DIR}/common
+  config: !scs-expand-env ${SCS_CONFIG_DIR}/config
+  secrets: &secrets-dir !scs-expand-env ${SCS_CONFIG_DIR}/secrets
+
+environments:
+  # Settings related to loading the 'scs-env' files
+  cache: true
+  reject_keys_containing_dots: true
+
+templates:
+  # Settings related to loading and rendering the configuration templates
+  cache: true
+  validate_on_startup: true
+  rendering_options: {}
+
+logs:
+  # Enable either 'file' or 'stdout' for the audit and application logs.
+  # Comment the one you're not using.
+  audit:
+    file:
+      path: /var/log/scs/audit.log.jsonl
+      max_size_mb: 1
+      backup_count: 5
+      level: INFO
+    # stdout:
+    #   level: INFO
+  application:
+    # file:
+    #   path: /var/log/scs/app.log.jsonl
+    #   max_size_mb: 1
+    #   backup_count: 5
+    #   level: INFO
+    stdout:
+      level: INFO
+  # Optionally, define a custom source name that will appear in the 'source'
+  # field of the logs. When undefined, the 'source' will be 'scs' by default
+  # source_name: my-configuration-server-1
+
+auth:
+  # Settings for the 'auth' module. The scs.auth module is used by default,
+  # but you can also use alternative flask blueprints for authentication
+  module: scs.auth
+  options:
+    # These options are passed as the 'options' attribute of the blueprint
+    # setup state (Use a @Blueprint.record decorator for your init function)
+    users_file: !scs-expand-env ${SCS_CONFIG_DIR}/scs-users.yaml
+    directories:
+      secrets: *secrets-dir
+    networks:
+      private_only: true
+      whitelist:
+      - 127.0.0.1/32
+      - 172.16.134.0/24
+    max_auth_fails_per_15_min: 10
+
+extensions:
+  # Extensions can be dynamically registered using the below properties.
+  #
+  # constructors should be subclasses of 'scs.yaml.SCSYamlTagConstructor' and
+  # can be used to load custom yaml-tags from the scs-env.yaml files.
+  # 
+  # blueprints can be any Flask Blueprint. The options are passed to the
+  # BluePrintSetupState that can be accessed from a init function with the
+  # @Blueprint.record decorator.
+  #
+  # under jinja2 you can specify custom jinja extensions that you can then use
+  # inside templates for rendering specific elements
+  constructors: []
+    # - name: scs.dummy_constructors.GeneratePhraseConstructor
+    #   options:
+    #     startswith: 'This is great because:'
+  blueprints: []
+    # - name: scs.dummy_blueprint.bp
+    #   options:
+    #     print_all_requests: true
+  jinja2: []
+    # - name: scs.jinja_extensions.GreatExtension

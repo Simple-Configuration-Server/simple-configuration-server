@@ -1,0 +1,13 @@
+# The scs-users file is loaded by the scs.auth module, when used, and should
+# then be referenced in auth.options.users_file in scs-configuration.yaml.
+# Under the 'users' attribute, provide a list of users. If you want to put
+# This file into source-control (e.g. GIT), please use a seperate 'secrets'
+# file for user tokens, as described below.
+users:
+  - id: test-user # Used to log authentication attempts and actions
+    token: !scs-secret 'scs-tokens.yaml#test-user' # Used as Bearer Token
+    has_access:
+      to_paths: # This user is allowed to access the following paths
+        - /configs/elasticsearch/*
+      from_networks:  # This user is allowed to connect from these networks
+        - 127.0.0.1/32
