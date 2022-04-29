@@ -1,0 +1,4 @@
+context:
+  heap: 1gb
+headers:
+  Content-Type: 'text/plain'

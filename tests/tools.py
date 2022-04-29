@@ -34,7 +34,6 @@ def get_test_client(config_dir: Path) -> Client:
     os.environ['SCS_CONFIG_DIR'] = config_dir.as_posix()
 
     app = create_app()
-    app.testing = True
     return app.test_client()
 
 
