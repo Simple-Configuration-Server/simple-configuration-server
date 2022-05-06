@@ -1,0 +1,29 @@
+directories:
+  common: !scs-expand-env ${SCS_CONFIG_DIR}/common
+  config: !scs-expand-env ${SCS_CONFIG_DIR}/config
+  secrets: &secrets-dir !scs-expand-env ${SCS_CONFIG_DIR}/secrets
+
+logs:
+  audit:
+    file:
+      path: /var/log/scs/audit.log.jsonl
+      max_size_mb: 1
+      backup_count: 5
+      level: INFO
+  application:
+    file:
+      path: /var/log/scs/app.log.jsonl
+      max_size_mb: 1
+      backup_count: 5
+      level: INFO
+
+auth:
+  options:
+    users_file: !scs-expand-env ${SCS_CONFIG_DIR}/scs-users.yaml
+    directories:
+      secrets: *secrets-dir
+    networks:
+      private_only: true
+      whitelist:
+      - 172.16.0.0/12
+    max_auth_fails_per_15_min: 10

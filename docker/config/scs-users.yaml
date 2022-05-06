@@ -1,0 +1,8 @@
+users:
+  - id: test-user
+    token: !scs-secret 'scs-tokens.yaml#test-user'
+    has_access:
+      to_paths:
+        - /configs/*
+      from_networks:
+        - 172.16.0.0/12
