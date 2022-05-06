@@ -1,0 +1,13 @@
+build_docker_image:
+  stage: build
+  image: docker:20
+  services:
+    - docker:20-dind
+  script:
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
+    - VERSION=$(cat VERSION)
+    - IMAGE_TAG="$CI_REGISTRY_IMAGE:$VERSION"
+    - 'if docker pull $IMAGE_TAG > /dev/null 2>&1; then echo "ERROR: An image with the given tag already exists. Please increment the contents of the VERSION file" && exit 1; fi'
+    - docker build . -t $IMAGE_TAG
+    - docker push $IMAGE_TAG
+  when: manual
