@@ -17,6 +17,8 @@ USER scs
 WORKDIR /app
 ENV PATH=/home/floodtags/.local:$PATH
 ENV SCS_CONFIG_DIR=/etc/scs
+ENV DISABLE_SCS_SSL=0
+EXPOSE 80
 EXPOSE 443
 
 # Copy scripts to the /app directory
