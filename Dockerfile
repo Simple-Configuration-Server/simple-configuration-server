@@ -20,11 +20,9 @@ ENV SCS_CONFIG_DIR=/etc/scs
 EXPOSE 443
 
 # Copy scripts to the /app directory
-COPY --chown=scs:scs ./docker/catch_signal.py ./
+COPY --chown=scs:scs ./docker/server.py ./
 COPY --chown=scs:scs ./docker/config /etc/scs
 COPY --from=builder /home/scs/.local /home/scs/.local
 COPY --chown=scs:scs ./scs ./scs
 
-# The default command can be overriden, for example to run the sanitation
-# instead of the ingestion
 ENTRYPOINT [ "python", "./server.py"]
