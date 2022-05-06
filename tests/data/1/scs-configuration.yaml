@@ -31,7 +31,6 @@ logs:
       level: CRITICAL
 
 auth:
-  module: scs.auth
   options:
     users_file: !scs-expand-env ${SCS_CONFIG_DIR}/scs-users.yaml
     directories:

@@ -39,8 +39,9 @@ logs:
 
 auth:
   # Settings for the 'auth' module. The scs.auth module is used by default,
-  # but you can also use alternative flask blueprints for authentication
-  module: scs.auth
+  # but you can also use alternative flask blueprints for authentication by
+  # uncommenting the below property
+  # blueprint: scs.auth.bp
   options:
     # These options are passed as the 'options' attribute of the blueprint
     # setup state (Use a @Blueprint.record decorator for your init function)

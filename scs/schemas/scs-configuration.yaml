@@ -180,22 +180,21 @@ properties:
   auth:
     type: object
     required:
-      - module
       - options
     properties:
-      module:
+      blueprint:
         type: string
         description:
-          The Python module used for authentication. A module should contain
-          a '.bp' attribute which is a Flask Blueprint. Use the
-          bp.record decorator on a initialization function. This function gets
-          passed a BluePrintSetupState, which contains the options that are
-          defined under the 'options' parameter
-        default: scs.auth
+          The Flask Blueprint to use for the authentication module. Use the
+          Blueprint.record decorator on a initialization function. This
+          function gets passed a BluePrintSetupState, which contains the
+          options that are defined under the 'options' parameter
+        default: scs.auth.bp
       options:
         type: object
         description:
-          This object will be passed as options through
+          This object will be passed as the .options attribute for the
+          BlueprintSetupState
         examples:
           # The configuration parameters used by the default scs.auth module
           - users_file: /etc/scs/scs-users.yaml

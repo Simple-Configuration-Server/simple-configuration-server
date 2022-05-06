@@ -4,7 +4,6 @@ Main entrypoint for the Simple Configuration Server
 """
 from pathlib import Path
 import os
-import importlib
 
 from flask import Flask
 import fastjsonschema
@@ -44,9 +43,9 @@ def create_app() -> Flask:
     app.register_blueprint(configs.bp)
 
     # Dynamically Register auth blueprint, and pass the auth config options
-    auth_module = importlib.import_module(auth_config['module'])
+    auth_blueprint = get_object_from_name(auth_config['blueprint'])
     app.register_blueprint(
-        auth_module.bp,
+        auth_blueprint,
         **auth_config['options'],
     )
 
