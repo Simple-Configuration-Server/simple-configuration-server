@@ -148,14 +148,15 @@ def _configure_yaml_loaders(
         for constructor_config in add_constructors:
             constructor_name = constructor_config['name']
             constructor_class = get_object_from_name(constructor_name)
-            if not isinstance(constructor_class, yaml.SCSYamlTagConstructor):
+            options = constructor_config.get('options', {})
+            constructor_instance = constructor_class(**options)
+            if not isinstance(constructor_instance, yaml.SCSYamlTagConstructor):  # noqa:E501
                 raise ValueError(
                     f"The constructor '{constructor_name}' is not a "
                     "SCSYamlTagConstructor subclass"
                 )
-            options = constructor_config.get('options', {})
             ENV_FILE_CONSTRUCTORS.append(
-                constructor_class(**options)
+                constructor_instance
             )
 
     SECRET_FILE_CONSTRUCTORS = [

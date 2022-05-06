@@ -33,8 +33,18 @@
             "type": "python",
             "request": "launch",
             "module": "pytest",
+            "args": [
+                "tests/${input:test_file}",
+            ],
             "console": "integratedTerminal",
             "justMyCode": false
+        }
+    ],
+    "inputs": [
+        {
+            "id": "test_file",
+            "description": "Name of the tests file in the /tests directory",
+            "type": "promptString",
         }
     ]
 }

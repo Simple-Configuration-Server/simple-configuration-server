@@ -1,4 +1,6 @@
 .env
 __pycache__
 .pytest_cache
-/tests/data/2/temp
+temp/
+build/
+*.egg-info/

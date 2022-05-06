@@ -1,1 +1,2 @@
 pytest>=7.1.1,<8.0.0
+./tests/packages/scs_extensions

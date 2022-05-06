@@ -227,7 +227,7 @@ properties:
         items:
           type: object
           required:
-            - class
+            - name
           additionalProperties: false
           properties:
             name:
