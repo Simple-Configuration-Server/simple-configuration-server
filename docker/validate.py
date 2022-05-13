@@ -37,13 +37,16 @@ def load_script_configuration() -> dict:
     if script_conf_path.is_file():
         configuration_data = scs.yaml.safe_load_file(script_conf_path)
     else:
-        print('scs-validate.yaml not found, using default settings')
+        print(
+            'scs-validate.yaml not found, using default settings',
+            flush=True,
+        )
         configuration_data = {}
     return fastjsonschema.validate(configuration_schema, configuration_data)
 
 
 if __name__ == '__main__':
-    print('Validating SCS configuration...')
+    print('Validating SCS configuration...', flush=True)
     scs_config = scs.load_application_configuration()
     script_config = load_script_configuration()
 
@@ -147,4 +150,4 @@ if __name__ == '__main__':
             assert data == validate_yaml, \
                 f'{base_message} Wrong YAML response {data}'
 
-    print('SCS configuration validation succesful!')
+    print('SCS configuration validation succesful!', flush=True)

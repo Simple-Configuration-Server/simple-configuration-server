@@ -22,7 +22,8 @@ EXPOSE 80
 EXPOSE 443
 
 # Copy scripts to the /app directory
-COPY --chown=scs:scs ./docker/server.py ./
+COPY --chown=scs:scs ./docker/*.py ./
+COPY --chown=scs:scs ./docker/scs-validate.SCHEMA.yaml ./
 COPY --chown=scs:scs ./docker/config /etc/scs
 COPY --from=builder /home/scs/.local /home/scs/.local
 COPY --chown=scs:scs ./scs ./scs
