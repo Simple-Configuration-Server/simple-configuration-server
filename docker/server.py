@@ -26,9 +26,9 @@ if __name__ == '__main__':
     disable_scs_ssl = bool(int(os.environ.get("DISABLE_SCS_SSL", "0")))
     if disable_scs_ssl:
         message = (
-            'DISABLE_SCS_SSL has been enabled, meaning INSECURE HTTP connections '
-            'are used. Use this only if you plan to have SSL terminated by a proxy'
-            ' like NGINX.'
+            'DISABLE_SCS_SSL has been enabled, meaning INSECURE HTTP'
+            ' connections are used. Use this only if you plan to have SSL'
+            ' terminated by a proxy like NGINX.'
         )
         flask_app.logger.warning(message)
         print(f'WARNING: {message}', flush=True)
