@@ -55,7 +55,7 @@ properties:
                   (192.168.1.0/24)
               
 
-patterProperties:
+patternProperties:
   ^x-.*$:
     description:
       Use additional variables, prefixed with x- to store common values or
@@ -64,4 +64,3 @@ patterProperties:
       services, or to define the IPs of machines, used by multiple users, in
       one place. Use YAML anchors to reference these parts from the
       users list.
-  

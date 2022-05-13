@@ -44,7 +44,7 @@ properties:
       jinja_env for the endpoint, that updates the default rendering options
       with the provided rendering options
     default: {}
-patterProperties:
+patternProperties:
   ^x-.*$:
     description:
       Use additional variables, prefixed with x- to store common values or
