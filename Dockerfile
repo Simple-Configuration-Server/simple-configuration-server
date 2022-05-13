@@ -4,7 +4,7 @@ USER scs
 WORKDIR /build
 COPY --chown=scs:scs requirements.txt .
 
-# install dependencies to the local user directory (eg. /home/floodtags/.local)
+# install dependencies to the local user directory (eg. /home/scs/.local)
 RUN pip install --user --no-warn-script-location -r requirements.txt
 
 # Now build a compact image
@@ -27,4 +27,4 @@ COPY --chown=scs:scs ./docker/config /etc/scs
 COPY --from=builder /home/scs/.local /home/scs/.local
 COPY --chown=scs:scs ./scs ./scs
 
-ENTRYPOINT [ "python", "./server.py"]
+CMD [ "python", "./server.py"]
