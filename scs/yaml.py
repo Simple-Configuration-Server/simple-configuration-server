@@ -65,11 +65,12 @@ class SCSYamlTagConstructor(ABC):
     Any constructors configured under extensions.constructors in the
     scs-configuration file should inherit from this class
     """
-    @property
-    @abstractmethod
-    def tag(self) -> str:
-        """The yaml tag to register the constructor for"""
-        pass
+    def __init__(self):
+        """
+        Validates if the 'tag' attribute is defined
+        """
+        if not hasattr(self, 'tag'):
+            raise AttributeError('.tag attribute of YAML constructor missing!')
 
     @abstractmethod
     def construct(self, loader: Loader, node: Node) -> Any:
@@ -297,7 +298,7 @@ def serialize_secrets(data: dict | list) -> list[str]:
 
 
 # The default constructors used by SCS
-class SCSSecretConstructor(SCSYamlTagConstructor, RelativePathMixin):
+class SCSSecretConstructor(RelativePathMixin, SCSYamlTagConstructor):
     """
     The default constructor for the 'scs-secret' tag
 
@@ -319,7 +320,7 @@ class SCSSecretConstructor(SCSYamlTagConstructor, RelativePathMixin):
         return SCSSecret(ref, ref_data)
 
 
-class SCSCommonConstructor(SCSYamlTagConstructor, RelativePathMixin):
+class SCSCommonConstructor(RelativePathMixin, SCSYamlTagConstructor):
     """
     The default constructor for the 'scs-common' tag
 
@@ -339,7 +340,7 @@ class SCSCommonConstructor(SCSYamlTagConstructor, RelativePathMixin):
         return self._get_data(base_dir, ref)
 
 
-class SCSRelativeConstructor(SCSYamlTagConstructor, RelativePathMixin):
+class SCSRelativeConstructor(RelativePathMixin, SCSYamlTagConstructor):
     """
     The default constructor for the 'scs-relative' tag
     """
@@ -395,3 +396,24 @@ class SCSGenSecretConstructor(SCSYamlTagConstructor):
     def construct(self, loader: Loader, node: Node) -> str:
         loader.resave = True
         return secrets.token_urlsafe(32)
+
+
+class SCSSimpleValueConstructor(SCSYamlTagConstructor):
+    """
+    A YAML tag constructor that can be used multiple times to replace a
+    specific tag (passed as init variable) with a fixed value. The main
+    use-case for this is for testing configuration files, in which case
+    advanced configuration parameters are not available.
+
+    Attributes:
+        tag: The tag to which this constructor should be applied
+
+        value: The value to use when parsing this tag
+    """
+    def __init__(self, *args, tag: str, value: Any, **kwargs):
+        self.tag = tag
+        self.value = value
+        super().__init__(*args, **kwargs)
+
+    def construct(self, loader: Loader, node: Node) -> Any:
+        return self.value

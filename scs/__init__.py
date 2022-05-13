@@ -13,17 +13,29 @@ from .tools import get_object_from_name
 
 current_dir = Path(__file__).absolute().parent
 
+# Load the schema to validate the configuration file against
+_schema_path = Path(current_dir, 'schemas/scs-configuration.yaml')
+_configuration_schema = yaml.safe_load_file(_schema_path)
 
-def create_app() -> Flask:
+
+def create_app(configuration: dict = None) -> Flask:
     """
     Factory to create the Flask app for the Simple Configuration Server
+
+    Args:
+        configuration:
+            If provided, this replaces the configuration loaded from the
+            scs-configuration file by 'load_application_configuration()'. Use
+            this to pass edited configuration files, e.g. for configuration
+            file validation
 
     Returns:
         The main flask application
     """
     app = Flask(__name__)
 
-    configuration = load_application_configuration()
+    if configuration is None:
+        configuration = load_application_configuration()
 
     # The auth configuration is passed to the blueprint directly
     # and not available under the app,config attribute
@@ -84,10 +96,12 @@ def load_application_configuration() -> dict:
 
     configuration_data = yaml.load_file(scs_conf_path, yaml.SCSAppConfigLoader)
 
-    # Load the schema to validate the configuration file against
-    schema_path = Path(
-        Path(__file__).absolute().parent, 'schemas/scs-configuration.yaml',
-    )
-    configuration_schema = yaml.safe_load_file(schema_path)
+    return validate_configuration(configuration_data)
 
-    return fastjsonschema.validate(configuration_schema, configuration_data)
+
+def validate_configuration(configuration_data: dict) -> dict:
+    """
+    Validates the given configuration data using the schema, and sets
+    any defaults that are defined in the schema
+    """
+    return fastjsonschema.validate(_configuration_schema, configuration_data)

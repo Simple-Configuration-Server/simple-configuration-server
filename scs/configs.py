@@ -97,7 +97,7 @@ def init(setup_state: BlueprintSetupState):
         register_audit_event(*audit_event_args)
 
     if enable_env_cache or check_templates:
-        relative_config_template_paths = _get_relative_config_template_paths()
+        relative_config_template_paths = get_relative_config_template_paths()
         for relative_url in relative_config_template_paths:
             env = _load_env(relative_url.lstrip('/'))
             if check_templates:
@@ -129,7 +129,7 @@ def _configure_yaml_loaders(
         validate_dots:
             Whether errors should be generated if dots are in keys
     """
-    ENV_FILE_CONSTRUCTORS = [
+    env_file_constructors = [
         yaml.SCSRelativeConstructor(
             validate_dots=validate_dots,
         ),
@@ -155,7 +155,7 @@ def _configure_yaml_loaders(
                     f"The constructor '{constructor_name}' is not a "
                     "SCSYamlTagConstructor subclass"
                 )
-            ENV_FILE_CONSTRUCTORS.append(
+            env_file_constructors.append(
                 constructor_instance
             )
 
@@ -163,7 +163,7 @@ def _configure_yaml_loaders(
         yaml.SCSGenSecretConstructor(),
     ]
 
-    for constructor in ENV_FILE_CONSTRUCTORS:
+    for constructor in env_file_constructors:
         yaml.SCSEnvFileLoader.add_constructor(
             constructor.tag, constructor.construct
         )
@@ -253,12 +253,10 @@ def _load_env(relative_path: str):
             else:
                 combined_env[key] = value
 
-        combined_env.update(data)
-
     return combined_env
 
 
-def _get_relative_config_template_paths() -> list[str]:
+def get_relative_config_template_paths() -> list[str]:
     """
     Gets the relative paths of all config templates
 
