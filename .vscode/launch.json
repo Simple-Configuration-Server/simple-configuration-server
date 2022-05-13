@@ -5,6 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "validate.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/docker/validate.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}/docker",
+            "env": {
+                "SCS_CONFIG_DIR": "${input:SCS_CONFIG_DIR}",
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+        },
+        {
             "name": "Python: Flask",
             "type": "python",
             "request": "launch",
@@ -38,12 +51,17 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": false
-        }
+        },
     ],
     "inputs": [
         {
             "id": "test_file",
             "description": "Name of the tests file in the /tests directory",
+            "type": "promptString",
+        },
+        {
+            "id": "SCS_CONFIG_DIR",
+            "description": "Location of the SCS configuration directory",
             "type": "promptString",
         }
     ]

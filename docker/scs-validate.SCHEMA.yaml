@@ -1,0 +1,100 @@
+type: object
+description: (JSON) schema for the scs-validate.yaml file
+additionalProperties: False
+properties:
+  endpoints:
+    type: object
+    additionalProperties: false
+    description:
+      Any endpoints not listed here are validated using the default
+      settings (GET request, response should be a status code < 400)
+    default: {}
+    patternProperties:
+      ^.*$:
+        anyOf:
+          - type: boolean
+            const: false
+            description: disable validation of this endpoint
+          - type: object
+            description:
+              Validate the response from this endpoint using
+              non-default settings
+            additionalProperties: false
+            minProperties: 1
+            properties:
+              request:
+                type: object
+                description: request details
+                default:
+                  method: GET
+                anyOf:
+                  - additionalProperties: false
+                    required:
+                    - method
+                    properties:
+                      method:
+                        const: GET
+                  - additionalProperties: false
+                    required:
+                    - method
+                    - json
+                    properties:
+                      method:
+                        const: POST
+                      json:
+                        type: object
+                        description: JSON Object passed with POST request
+              response:
+                type: object
+                additionalProperties: false
+                default: {}
+                properties:
+                  status:
+                    type: integer
+                  headers:
+                    type: object
+                  text:
+                    type: string
+                    description: The response.text should be equal to this
+                  json:
+                    type: object
+                    description:
+                      The response, parsed as JSON, should equal this
+                  yaml:
+                    type: object
+                    description:
+                      The response, parsed as YAML, should equal this
+              
+  scs_configuration:
+    type: object
+    description:
+      When defined, these parts of the configuration are overriden. By default,
+      the logs are changed to write to stdout at ERROR level. The script itself
+      already applies a dummy auth.blueprint, to disable authentication, and
+      appends a SCSSimpleValueConstructor for the tag !scs-secret to the
+      extensions.constructors list, so secrets are not needed for validation.
+    default:
+      logs:
+        audit:
+          stdout:
+            level: ERROR
+        application:
+          stdout:
+            level: ERROR
+    properties:
+      logs:
+        default:
+          audit:
+            stdout:
+              level: ERROR
+          application:
+            stdout:
+              level: ERROR
+  
+  handle_errors:
+    type: boolean
+    description:
+      By default, SCS errors will make the test fail, and won't return a 500
+      status code. Set this to 'true' in case you want errors to return a 500
+      status code, rather than be raised
+    default: false
