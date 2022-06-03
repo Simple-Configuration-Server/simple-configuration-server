@@ -1,0 +1,67 @@
+- key: scs
+  title: Simple Configuration Server Logs
+  description: >
+    Content from the application and audit logs of SCS
+  fields:
+    - name: scs.log.date
+      type: date
+      required: true
+      description: The date and time at which the entry was logged
+
+    - name: scs.log.level
+      type: keyword
+      required: true
+      description: The log level of the entry
+
+    - name: scs.log.source
+      type: keyword
+      required: true
+      description: >
+        The 'source' property of SCS logs, configurable via scs-configuration.yaml
+
+    - name: scs.log.message
+      type: text
+      ignore_above: 0
+      required: false
+      description: The log message
+
+    - name: scs.log.module
+      type: keyword
+      required: false
+      description: >
+        The python module that logged the event
+
+    - name: scs.log.error.type
+      type: keyword
+      required: false
+      description: The type of error or exception that occured
+
+    - name: scs.log.error.info
+      type: text
+      required: false
+      description: Exception traceback
+
+    - name: scs.audit.eventType
+      type: keyword
+      required: false
+      description: Audit event type
+
+    - name: scs.audit.client_ip
+      type: keyword
+      required: false
+      description: IP address related to the Audit event
+    
+    - name: scs.audit.requested_path
+      type: keyword
+      required: false
+      description: Path related to the audit event
+
+    - name: scs.audit.user_id
+      type: keyword
+      required: false
+      description: User ID related to the Audit event
+
+    - name: scs.audit.requested_secrets
+      type: keyword
+      required: false
+      description: Secrets related to the audit event

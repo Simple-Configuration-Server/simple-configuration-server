@@ -1,0 +1,7 @@
+type: filestream
+id: scs-application-logs
+paths: 
+  - {{.path}}
+parsers:
+  - ndjson:
+      overwrite_keys: true

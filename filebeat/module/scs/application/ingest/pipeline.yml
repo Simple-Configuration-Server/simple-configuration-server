@@ -1,0 +1,41 @@
+description: Pipeline for parsing SCS application log events
+on_failure:
+- set:
+    field: error.message
+    value: '{{ _ingest.on_failure_message }}'
+processors:
+- set:
+    field: event.ingested
+    value: '{{_ingest.timestamp}}'
+- set:
+    copy_from: '@timestamp'
+    field: event.created
+- date:
+    field: date
+    formats:
+    - ISO8601
+    target_field: '@timestamp'
+- rename:
+    field: source
+    target_field: scs.log.source
+- rename:
+    field: date
+    target_field: scs.log.date
+- rename:
+    field: level
+    target_field: scs.log.level
+- rename:
+    field: message
+    target_field: scs.log.message
+    ignore_missing: true
+- rename:
+    field: module
+    target_field: scs.log.module
+- rename:
+    field: errorType
+    target_field: scs.log.error.type
+    ignore_missing: true
+- rename:
+    field: errorInfo
+    target_field: scs.log.error.info
+    ignore_missing: true

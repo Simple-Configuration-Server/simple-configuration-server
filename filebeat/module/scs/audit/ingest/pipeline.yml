@@ -1,0 +1,49 @@
+description: Pipeline for parsing SCS audit events
+on_failure:
+- set:
+    field: error.message
+    value: '{{ _ingest.on_failure_message }}'
+processors:
+- set:
+    field: event.ingested
+    value: '{{_ingest.timestamp}}'
+- set:
+    copy_from: '@timestamp'
+    field: event.created
+- date:
+    field: date
+    formats:
+    - ISO8601
+    target_field: '@timestamp'
+- rename:
+    field: date
+    target_field: scs.log.date
+- rename:
+    field: source
+    target_field: scs.log.source
+- rename:
+    field: level
+    target_field: scs.log.level
+- rename:
+    field: message
+    target_field: scs.log.message
+    ignore_missing: true
+- rename:
+    field: event.type
+    target_field: scs.audit.eventType
+- rename:
+    field: event.details.ip
+    target_field: scs.audit.client_ip
+    ignore_missing: true
+- rename:
+    field: event.details.path
+    target_field: scs.audit.requested_path
+    ignore_missing: true
+- rename:
+    field: event.details.user
+    target_field: scs.audit.user_id
+    ignore_missing: true
+- rename:
+    field: event.details.secrets
+    target_field: scs.audit.requested_secrets
+    ignore_missing: true

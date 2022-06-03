@@ -1,0 +1,12 @@
+- module: scs
+  # Application Logs
+  application:
+    enabled: true
+    # Optional override of default log file path (/var/log/scs/app.log.jsonl)
+    #var.path:
+
+  # Audit Logs
+  audit:
+    enabled: true
+    # Optional override of default log file path (/var/log/scs/audit.log.jsonl)
+    #var.path:

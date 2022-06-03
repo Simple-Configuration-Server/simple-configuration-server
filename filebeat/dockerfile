@@ -1,0 +1,8 @@
+FROM docker.elastic.co/beats/filebeat:8.2.2-amd64
+COPY --chown=root:root ./modules.d/scs.yml /usr/share/filebeat/modules.d/scs.yml
+COPY --chown=root:root ./module/scs /usr/share/filebeat/module/scs
+COPY ./fields.APPEND.yml /tmp/fields.APPEND.yml
+USER root
+RUN echo 'setup.template.fields: ${path.config}/fields.yml' >> /usr/share/filebeat/filebeat.yml
+RUN cat /tmp/fields.APPEND.yml >> /usr/share/filebeat/fields.yml
+USER filebeat
