@@ -77,6 +77,19 @@ if __name__ == '__main__':
     client = app.test_client()
     client.environ_base = {'REMOTE_ADDR': '127.0.0.1'}
 
+    # In case secrets are not allowed, validate that these are indeed not
+    # present
+    if not script_config['allow_secrets']:
+        if 'secrets' in scs_config['directories']:
+            secrets_dir = Path(scs_config['directories']['secrets'])
+            if secrets_dir.is_dir():
+                assert not any(secrets_dir.iterdir()), (
+                    'Secrets directory is not emtpy, even though '
+                    'allow_secrets: false is set'
+                )
+
+    # Build the list of paths to test, and check if these are in-line with any
+    # configured overrides
     all_test_paths = set([
         f'/configs/{p.lstrip("/")}'
         for p in scs.configs.get_relative_config_template_paths()
@@ -91,6 +104,8 @@ if __name__ == '__main__':
             f'paths: {invalid_paths}'
         )
 
+    # Build test definitions for each endpoint, based on the overrides that
+    # are configured
     test_definitions = {}
     for path in all_test_paths:
         path_config = configured_endpoints.get(path, True)

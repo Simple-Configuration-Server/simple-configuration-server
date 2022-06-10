@@ -98,3 +98,12 @@ properties:
       status code. Set this to 'true' in case you want errors to return a 500
       status code, rather than be raised
     default: false
+  
+  allow_secrets:
+    type: boolean
+    description:
+      By default, the validation script fails if secrets are present, since this
+      should not be the case when it's used in CI/CD to validate the contents of
+      a configuration repository. Disable this to allow secrets to be
+      present during validation
+    default: false

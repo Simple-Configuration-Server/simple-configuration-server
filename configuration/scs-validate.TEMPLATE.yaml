@@ -61,3 +61,9 @@ scs_configuration:
 # response with a 500 error code. If you need to check for 500 error codes,
 # enable the below.
 handle_errors: false
+
+# By default, the validation script fails if secrets are present, since this
+# should not be the case when it's used in CI/CD to validate the contents of
+# a configuration repository. Disable the following to allow secrets to be
+# present during validation
+allow_secrets: false
