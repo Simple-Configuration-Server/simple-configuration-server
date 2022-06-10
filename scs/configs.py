@@ -65,7 +65,12 @@ def init(setup_state: BlueprintSetupState):
 
     _config_basepath = Path(scs_config['directories']['config']).absolute()
     common_basepath = Path(scs_config['directories']['common']).absolute()
-    secrets_basepath = Path(scs_config['directories']['secrets']).absolute()
+    if 'secrets' in scs_config['directories']:
+        secrets_basepath = Path(
+            scs_config['directories']['secrets']
+        ).absolute()
+    else:
+        secrets_basepath = None
     add_constructors = scs_config['extensions']['constructors']
     check_templates = scs_config['templates']['validate_on_startup']
     default_rendering_options = scs_config['templates']['rendering_options']
