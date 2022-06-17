@@ -77,7 +77,10 @@ properties:
     default:
       cache: true
       validate_on_startup: true
-      rendering_options: {}
+      rendering_options:
+        trim_blocks: true
+        lstrip_blocks: true
+        keep_trailing_newline: true
     additionalProperties: false
     properties:
       validate_on_startup:
@@ -101,10 +104,13 @@ properties:
           (https://jinja.palletsprojects.com/en/3.0.x/api/)
         properties:
           trim_blocks:
+            type: boolean
             default: true
           lstrip_blocks:
+            type: boolean
             default: true
           keep_trailing_newline:
+            type: boolean
             default: true
       cache:
         type: boolean
