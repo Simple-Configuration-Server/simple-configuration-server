@@ -57,11 +57,9 @@ properties:
                     type: string
                     description: The response.text should be equal to this
                   json:
-                    type: object
                     description:
                       The response, parsed as JSON, should equal this
                   yaml:
-                    type: object
                     description:
                       The response, parsed as YAML, should equal this
               
