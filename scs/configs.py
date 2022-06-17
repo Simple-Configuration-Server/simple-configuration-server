@@ -65,6 +65,14 @@ def init(setup_state: BlueprintSetupState):
 
     _config_basepath = Path(scs_config['directories']['config']).absolute()
     common_basepath = Path(scs_config['directories']['common']).absolute()
+    if not _config_basepath.is_dir():
+        raise ValueError(
+            'The provided directories.config path does not exist!'
+        )
+    if not common_basepath.is_dir():
+        raise ValueError(
+            'The provided directories.common path does not exist!'
+        )
     if 'secrets' in scs_config['directories']:
         secrets_basepath = Path(
             scs_config['directories']['secrets']
