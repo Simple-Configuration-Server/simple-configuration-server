@@ -194,7 +194,7 @@ class RelativePathMixin:
         ref_parts = ref.split('#')
 
         if len(ref_parts) == 1:
-            file_path = ref_parts
+            file_path = ref_parts[0]
             attribute_loc = None
         else:
             file_path, attribute_loc = ref_parts
