@@ -25,7 +25,7 @@
             "env": {
                 "FLASK_APP": "scs",
                 "FLASK_ENV": "development",
-                "SCS_CONFIG_DIR": "${workspaceFolder}/tests/data/1",
+                "SCS_CONFIG_DIR": "${input:SCS_CONFIG_DIR}",
             },
             "args": [
                 "run",
