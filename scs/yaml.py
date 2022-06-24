@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import secrets
 import copy
+from random import randint
 
 from yaml import Loader, Node, SafeLoader, dump, safe_load
 
@@ -395,7 +396,7 @@ class SCSGenSecretConstructor(SCSYamlTagConstructor):
 
     def construct(self, loader: Loader, node: Node) -> str:
         loader.resave = True
-        return secrets.token_urlsafe(32)
+        return secrets.token_urlsafe(randint(32, 64))
 
 
 class SCSSimpleValueConstructor(SCSYamlTagConstructor):
