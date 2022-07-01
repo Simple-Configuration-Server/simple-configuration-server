@@ -42,6 +42,7 @@ def load_script_configuration() -> dict:
     # 'default' endpoint test definition based on the JSON schema
     if script_conf_path.is_file():
         configuration_data = scs.yaml.safe_load_file(script_conf_path)
+        configuration_data.setdefault('endpoints', {})
         configuration_data['endpoints']['_default'] = {}
     else:
         print(
