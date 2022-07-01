@@ -114,7 +114,7 @@ def init(setup_state: BlueprintSetupState):
         relative_config_template_paths = get_relative_config_template_paths()
         for relative_url in relative_config_template_paths:
             env = _load_env(relative_url.lstrip('/'))
-            if check_templates:
+            if check_templates and env['template']['enabled']:
                 yaml.serialize_secrets(env)
                 template = setup_state.app.jinja_env.get_template(
                     relative_url.lstrip('/')
