@@ -128,8 +128,8 @@ def test_global_whitelisted_but_not_user_whitelisted():
 
 def test_not_globally_whitelisted():
     """
-    An IP address that is not globally whitelisted should trigger a generic
-    401 unauthorized error
+    An IP address that is not globally whitelisted should also trigger a
+    403 error
     """
     response = client.get(
         '/configs/elasticsearch/elasticsearch.yml',
@@ -140,4 +140,5 @@ def test_not_globally_whitelisted():
         },
         environ_base={'REMOTE_ADDR': '172.16.94.2'}
     )
-    assert response.status_code == 401
+    assert response.status_code == 403
+    assert response.get_json()['error']['id'] == 'unauthorized-ip'

@@ -4,7 +4,6 @@ Flask Blueprint containing all behaviour related to the authentication and
 authorization of users/clients
 """
 from pathlib import Path
-import re
 import ipaddress
 import datetime
 import logging
@@ -228,7 +227,10 @@ def check_auth():
     if not _is_whitelisted(user_ip, _global_whitelist):
         # This check is added to prevent being able to spoof any IP
         # address to circumvent the rate limiter.
-        abort(401)
+
+        # Note that this is not logged, since this would allow non-whitelisted
+        # to overflow the logs
+        abort(403, description={'id': 'unauthorized-ip'})
 
     if _rate_limiter.is_limited(request.remote_addr):
         g.add_audit_event(event_type='rate-limited')
