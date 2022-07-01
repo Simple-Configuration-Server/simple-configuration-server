@@ -214,12 +214,18 @@ class RelativePathMixin:
         else:
             loc_levels = attribute_loc.split('.')
             level_data = file_data
-            for level in loc_levels:
-                if match := self.index_regex.match(level):
-                    index = int(match.group(1))
-                    level_data = level_data[index]
-                else:
-                    level_data = level_data[level]
+            try:
+                for level in loc_levels:
+                    if match := self.index_regex.match(level):
+                        index = int(match.group(1))
+                        level_data = level_data[index]
+                    else:
+                        level_data = level_data[level]
+            except (KeyError, IndexError):
+                raise ValueError(
+                    f'The reference {ref} in file {file_path.as_posix()} '
+                    'could not be resolved!'
+                )
             ref_data = level_data
 
         return ref_data
