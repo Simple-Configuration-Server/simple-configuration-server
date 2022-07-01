@@ -1,13 +1,18 @@
-context:
-  hosts: !scs-common 'common-vars.yaml#hosts'
-  main_host: !scs-common 'common-vars.yaml#hosts.[0]'
-  http_port: !scs-common 'common-vars.yaml#elasticsearch.port'
-  node_name: "main ES host"
-  password: !scs-secret 'es_secrets.yaml#password'
-  heap: !scs-relative 'heap_size.scs-env.yaml#context.heap'
-headers:
-  Content-Type: 'application/x-yaml'
-methods:
-  - GET
-rendering_options:
-  keep_trailing_newline: false
+template:
+  context:
+    hosts: !scs-common 'common-vars.yaml#hosts'
+    main_host: !scs-common 'common-vars.yaml#hosts.[0]'
+    http_port: !scs-common 'common-vars.yaml#elasticsearch.port'
+    node_name: "main ES host"
+    password: !scs-secret 'es_secrets.yaml#password'
+    heap: !scs-relative 'heap_size.scs-env.yaml#template.context.heap'
+  rendering_options:
+    keep_trailing_newline: false
+
+response:
+  headers:
+    Content-Type: 'application/x-yaml'
+
+request:
+  methods:
+    - GET

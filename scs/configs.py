@@ -260,11 +260,12 @@ def _load_env(relative_path: str):
 
     for rel_path in rel_env_file_paths:
         data = _load_env_file(rel_path)
-        for key, value in data.items():
-            if isinstance(value, dict):
-                combined_env[key].update(value)
-            else:
-                combined_env[key] = value
+        for pkey, pvalue in data.items():
+            for ckey, cvalue in pvalue.items():
+                if isinstance(cvalue, dict):
+                    combined_env[pkey][ckey].update(cvalue)
+                else:
+                    combined_env[pkey][ckey] = cvalue
 
     return combined_env
 
@@ -344,15 +345,15 @@ def view_config_file(path: str) -> Response:
 
     env = _load_env(path)
 
-    if request.method not in env['methods']:
+    if request.method not in env['request']['methods']:
         abort(405)
 
     if request.method == 'POST':
-        env['context'].update(request.get_json(force=True))
+        env['template']['context'].update(request.get_json(force=True))
 
     secret_ids = yaml.serialize_secrets(env)
 
-    if rendering_options := env['rendering_options']:
+    if rendering_options := env['template']['rendering_options']:
         # Since some options seem to erroneously not be supported, these are
         # applied later
         # https://github.com/pallets/jinja/issues/1645
@@ -368,12 +369,12 @@ def view_config_file(path: str) -> Response:
         jinja_env = current_app.jinja_env
 
     template = jinja_env.get_template(path.lstrip('/'))
-    rendered_template = template.render(env['context'])
+    rendered_template = template.render(env['template']['context'])
 
     response = make_response(rendered_template)
     response.headers.clear()  # Remove the default 'html' content type
-    response.headers.update(env['headers'])
-    response.status = env['status']
+    response.headers.update(env['response']['headers'])
+    response.status = env['response']['status']
 
     g.add_audit_event(event_type='config-loaded')
     if secret_ids:

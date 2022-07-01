@@ -1,5 +1,7 @@
-context:
-  status: !scs-common 'common-vars.yaml#server_status'
+template:
+  context:
+    status: !scs-common 'common-vars.yaml#server_status'
 
-headers:
-  Content-Type: text/html
+response:
+  headers:
+    Content-Type: text/html

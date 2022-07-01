@@ -1,49 +1,72 @@
 description: All *.scs-env.yaml files are validated against this schema
 type: object
-additionalProperties: False
+additionalProperties: false
 properties:
-  context:
-    description:
-      The contents of this object are passed as context for rendering the
-      templates
+  template:
     type: object
-    default: {}
-  headers:
-    description: Response headers returned when requesting the resource
-    type: object
-    default: {}
-    patternProperties:
-      ^.*$:
-        type: string
-        description: All header values must be given as strings
-  status:
-    description: Response status code
-    type: integer
-    default: 200
-    minimum: 100
-    exclusiveMaximum: 600
-  methods:
-    description:
-      Allowed methods. For example, if the context is incomplete by default,
-      only a POST method should be allowed, since otherwise a template
-      rendering error may occur
-    type: array
     default:
-      - GET
-      - POST
-    uniqueItems: true
-    items:
-      # Only GET and POST can be handled for configs
-      enum:
+      context: {}
+      rendering_options: {}
+    additionalProperties: false
+    properties:
+      context:
+        description:
+          The contents of this object are passed as context for rendering the
+          templates
+        type: object
+        default: {}
+      rendering_options:
+        type: object
+        description:
+          When provided, the jinja.overlay function is used to create a dedicated
+          jinja_env for the endpoint, that updates the default rendering options
+          with the provided rendering options
+        default: {}
+  request:
+    type: object
+    default:
+      methods:
         - GET
         - POST
-  rendering_options:
+    additionalProperties: false
+    properties:
+      methods:
+        description:
+          Allowed methods. For example, if the context is incomplete by default,
+          only a POST method should be allowed, since otherwise a template
+          rendering error may occur
+        type: array
+        default:
+          - GET
+          - POST
+        uniqueItems: true
+        items:
+          # Only GET and POST can be handled for configs
+          enum:
+            - GET
+            - POST
+  response:
     type: object
-    description:
-      When provided, the jinja.overlay function is used to create a dedicated
-      jinja_env for the endpoint, that updates the default rendering options
-      with the provided rendering options
-    default: {}
+    default:
+      status: 200
+      headers: {}
+    additionalProperties: false
+    properties:
+      headers:
+        description: Response headers returned when requesting the resource
+        type: object
+        default: {}
+        patternProperties:
+          ^.*$:
+            type: string
+            description: All header values must be given as strings
+      status:
+        description: Response status code
+        type: integer
+        default: 200
+        minimum: 100
+        exclusiveMaximum: 600
+
 patternProperties:
   ^x-.*$:
     description:

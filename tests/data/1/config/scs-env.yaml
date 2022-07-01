@@ -1,2 +1,3 @@
-context:
-  password: !scs-secret 'es_secrets.yaml#unusedpassword'
+template:
+  context:
+    password: !scs-secret 'es_secrets.yaml#unusedpassword'

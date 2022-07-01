@@ -1,4 +1,7 @@
-context:
-  heap: 1gb
-headers:
-  Content-Type: 'text/plain'
+template:
+  context:
+    heap: 1gb
+
+response:
+  headers:
+    Content-Type: 'text/plain'

@@ -1,4 +1,4 @@
-headers:
-  Location: /configs/elasticsearch/cluster_name
-
-status: 301
+response:
+  headers:
+    Location: /configs/elasticsearch/cluster_name
+  status: 301

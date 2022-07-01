@@ -1,4 +1,7 @@
-context:
-  constructed_var: !capitalize-extend-phrase 'this is the base phrase'
-headers:
-  Content-Type: 'text/plain'
+template:
+  context:
+    constructed_var: !capitalize-extend-phrase 'this is the base phrase'
+
+response:
+  headers:
+    Content-Type: 'text/plain'
