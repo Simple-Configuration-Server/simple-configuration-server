@@ -5,9 +5,11 @@ and testing requests to every resource
 import os
 from pathlib import Path
 from typing import Any
+from json import JSONDecodeError
 
 from flask import Blueprint
 import fastjsonschema
+from yaml import YAMLError
 
 import scs
 
@@ -153,16 +155,36 @@ if __name__ == '__main__':
             assert response.text == validate_text, \
                 f'{base_message} Wrong text response \'{response.text}\''
 
+        parse_as = defininition['response'].get('format')
+
         validate_json = defininition['response'].get('json')
-        if validate_json is not None:
-            data = response.get_json(force=True, silent=True)
-            assert data == validate_json, \
-                f'{base_message} Wrong JSON response {data}'
+        parse_json = (parse_as == 'json' or validate_json is not None)
+        if parse_json:
+            try:
+                data = response.get_json(force=True)
+            except JSONDecodeError:
+                print(
+                    f'Response from {path} could not be parsed as JSON:',
+                    flush=True,
+                )
+                raise
+            if validate_json is not None:
+                assert data == validate_json, \
+                    f'{base_message} Wrong JSON response {data}'
 
         validate_yaml = defininition['response'].get('yaml')
-        if validate_yaml is not None:
-            data = scs.yaml.safe_load(response.text)
-            assert data == validate_yaml, \
-                f'{base_message} Wrong YAML response {data}'
+        parse_yaml = (parse_as == 'yaml' or validate_yaml is not None)
+        if parse_yaml:
+            try:
+                data = scs.yaml.safe_load(response.text)
+            except YAMLError:
+                print(
+                    f'Response from {path} could not be parsed as YAML:',
+                    flush=True,
+                )
+                raise
+            if validate_yaml is not None:
+                assert data == validate_yaml, \
+                    f'{base_message} Wrong YAML response {data}'
 
     print('SCS configuration validation succesful!', flush=True)

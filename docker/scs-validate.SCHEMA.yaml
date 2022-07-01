@@ -62,6 +62,16 @@ properties:
                   yaml:
                     description:
                       The response, parsed as YAML, should equal this
+                  format:
+                    type: string
+                    enum:
+                      - json
+                      - yaml
+                    description:
+                      Instead of validating the complete response contents (
+                      e.g. using the 'json' or 'yaml' properties), setting
+                      this property will only check if the response can be
+                      parsed in this format.
               
   scs_configuration:
     type: object
