@@ -20,7 +20,6 @@ properties:
               Validate the response from this endpoint using
               non-default settings
             additionalProperties: false
-            minProperties: 1
             properties:
               request:
                 type: object

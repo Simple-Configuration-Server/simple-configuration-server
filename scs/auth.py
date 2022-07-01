@@ -12,7 +12,7 @@ import logging
 from flask import Blueprint, request, abort, g
 from flask.blueprints import BlueprintSetupState
 
-from . import yaml, errors
+from . import yaml, errors, tools
 from .logging import register_audit_event
 
 
@@ -184,13 +184,10 @@ def init(setup_state: BlueprintSetupState):
             parsed_whitelist.append(network)
         user['has_access']['from_networks'] = parsed_whitelist
         # Parse the path whitelist regexes
-        parsed_allowed = []
-        for item in user['has_access']['to_paths']:
-            regex_str = '^' + re.escape(item).replace(r'\*', '(.*)') + '$'
-            parsed_allowed.append(
-                re.compile(regex_str)
-            )
-        user['has_access']['to_paths'] = parsed_allowed
+        user['has_access']['to_paths'] = [
+            tools.build_pattern_from_path(p)
+            for p in user['has_access']['to_paths']
+        ]
 
     for error_args in _ERRORS:
         errors.register(*error_args)

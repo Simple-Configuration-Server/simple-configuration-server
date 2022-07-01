@@ -6,12 +6,14 @@ import os
 from pathlib import Path
 from typing import Any
 from json import JSONDecodeError
+import copy
 
 from flask import Blueprint
 import fastjsonschema
 from yaml import YAMLError
 
 import scs
+from scs import tools
 
 current_dir = Path(__file__).parent.absolute()
 
@@ -36,21 +38,83 @@ def load_script_configuration() -> dict:
     configuration_schema = scs.yaml.safe_load_file(schema_path)
     config_dir = Path(os.environ['SCS_CONFIG_DIR']).absolute()
     script_conf_path = Path(config_dir, 'scs-validate.yaml')
+    # Add endpoints._default to the configuration, so the script can load the
+    # 'default' endpoint test definition based on the JSON schema
     if script_conf_path.is_file():
         configuration_data = scs.yaml.safe_load_file(script_conf_path)
+        configuration_data['endpoints']['_default'] = {}
     else:
         print(
             'scs-validate.yaml not found, using default settings',
             flush=True,
         )
-        configuration_data = {}
+        configuration_data = {'endpoints': {'_default': {}}}
     return fastjsonschema.validate(configuration_schema, configuration_data)
+
+
+def get_test_definition(
+        path: str, default: dict, endpoints: dict
+        ) -> bool | dict:
+    """
+    Get the test definition for the given path, based on the endpoint
+    configurations matching the path
+
+    Args:
+        path:
+            The path to test (e.g. /configs/test.json)
+
+        default:
+            The default test definition, as defined in the scs-validate JSON
+            schema
+
+        endpoints:
+            The configuration under the 'endpoints' property of the config file
+
+    Returns:
+        The test definition for this endpoint. If wildcard paths
+        are defined, these are applied first, with definitions for longer
+        paths (more specific) taking precedence over definitions for shorter
+        ones
+    """
+    matching_config_paths = []
+    for config_path in endpoints.keys():
+        if tools.contains_wildcard(config_path):
+            pattern = tools.build_pattern_from_path(config_path)
+            if pattern.match(path):
+                matching_config_paths.append(config_path)
+        else:
+            if path.lower() == config_path.lower():
+                matching_config_paths.append(config_path)
+
+    # First apply shorter (less specific) configurations
+    matching_config_paths.sort(key=lambda k: len(k))
+
+    path_config = copy.deepcopy(default)
+    for config_path in matching_config_paths:
+        endpoint_config = endpoints[config_path]
+
+        if endpoint_config is False:
+            path_config = False
+        else:
+            if path_config is False:
+                path_config = copy.deepcopy(endpoint_config)
+            else:
+                for key, value in endpoint_config.items():
+                    if key not in path_config:
+                        path_config[key] = copy.deepcopy(value)
+                    else:
+                        path_config[key].update(
+                            copy.deepcopy(value)
+                        )
+
+    return path_config
 
 
 if __name__ == '__main__':
     print('Validating SCS configuration...', flush=True)
     scs_config = scs.load_application_configuration()
     script_config = load_script_configuration()
+    default_test_definition = script_config['endpoints'].pop('_default')
 
     # Override configuration with validation specific properties
     for key, value in script_config['scs_configuration'].items():
@@ -92,50 +156,49 @@ if __name__ == '__main__':
 
     # Build the list of paths to test, and check if these are in-line with any
     # configured overrides
-    all_test_paths = set([
-        f'/configs/{p.lstrip("/")}'
+    all_test_paths = [
+        f'/configs/{p.lstrip("/")}'.lower()
         for p in scs.configs.get_relative_config_template_paths()
-    ])
+    ]
 
     configured_endpoints = script_config['endpoints']
-    configured_paths = set(configured_endpoints.keys())
-    invalid_paths = configured_paths.difference(all_test_paths)
+    invalid_paths = set()
+    for path in configured_endpoints.keys():
+        if tools.contains_wildcard(path):
+            pattern = tools.build_pattern_from_path(path)
+            if not any([pattern.match(url) for url in all_test_paths]):
+                invalid_paths.add(path)
+        else:
+            if path.lower() not in all_test_paths:
+                invalid_paths.add(path)
+
     if invalid_paths:
         raise ValueError(
             'Endpoints configuration in scs-validate.yaml contains invalid '
             f'paths: {invalid_paths}'
         )
 
-    # Build test definitions for each endpoint, based on the overrides that
-    # are configured
-    test_definitions = {}
-    for path in all_test_paths:
-        path_config = configured_endpoints.get(path, True)
-        if not path_config:
-            # endpoint validation explicitly disabled
-            continue
-        if not isinstance(path_config, dict):
-            path_config = {
-                'request': {'method': 'GET'},
-                'response': {},
-            }
-        test_definitions[path] = path_config
-
     test_results = {}
-    for path, defininition in test_definitions.items():
-        if defininition['request']['method'] == 'GET':
+    for path in all_test_paths:
+        definition = get_test_definition(
+            path, default_test_definition, configured_endpoints
+        )
+        if not definition:
+            continue
+
+        if definition['request']['method'] == 'GET':
             response = client.get(
                 path
             )
         else:
             response = client.post(
                 path,
-                json=defininition['request']['json'],
+                json=definition['request']['json'],
             )
 
         base_message = f'Validation of path {path} failed:'
 
-        validate_status = defininition['response'].get('status')
+        validate_status = definition['response'].get('status')
         if validate_status is not None:
             assert response.status_code == validate_status, \
                 f'{base_message} Wrong status code {response.status_code}'
@@ -143,28 +206,28 @@ if __name__ == '__main__':
             assert response.status_code < 400, \
                 f'{base_message} Wrong status code {response.status_code}'
 
-        validate_headers = defininition['response'].get('headers')
+        validate_headers = definition['response'].get('headers')
         if validate_headers is not None:
             for key, value in validate_headers.items():
                 actual_value = response.headers.get(key)
                 assert actual_value == value, \
                     f'{base_message} Wrong header \'{key}: {actual_value}\''
 
-        validate_text = defininition['response'].get('text')
+        validate_text = definition['response'].get('text')
         if validate_text is not None:
             assert response.text == validate_text, \
                 f'{base_message} Wrong text response \'{response.text}\''
 
-        parse_as = defininition['response'].get('format')
+        parse_as = definition['response'].get('format')
 
-        validate_json = defininition['response'].get('json')
+        validate_json = definition['response'].get('json')
         parse_json = (parse_as == 'json' or validate_json is not None)
         if parse_json:
             try:
                 data = response.get_json(force=True)
             except JSONDecodeError:
                 print(
-                    f'Response from {path} could not be parsed as JSON:',
+                    f'{base_message} Response could not be parsed as JSON',
                     flush=True,
                 )
                 raise
@@ -172,14 +235,14 @@ if __name__ == '__main__':
                 assert data == validate_json, \
                     f'{base_message} Wrong JSON response {data}'
 
-        validate_yaml = defininition['response'].get('yaml')
+        validate_yaml = definition['response'].get('yaml')
         parse_yaml = (parse_as == 'yaml' or validate_yaml is not None)
         if parse_yaml:
             try:
                 data = scs.yaml.safe_load(response.text)
             except YAMLError:
                 print(
-                    f'Response from {path} could not be parsed as YAML:',
+                    f'{base_message} Response could not be parsed as YAML',
                     flush=True,
                 )
                 raise

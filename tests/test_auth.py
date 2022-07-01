@@ -72,6 +72,31 @@ def test_path_access_denied():
     assert response.get_json()['error']['id'] == 'unauthorized-path'
 
     response = client.get(
+        '/configs/tags_*.json',
+        headers={
+            'Authorization': (
+                f"Bearer {tokens['test-user']}"
+            ),
+        },
+        environ_base={'REMOTE_ADDR': '192.168.1.34'}
+    )
+    rdata = response.get_json(force=True)
+    assert rdata['Just an example for'] == 'Testing escaped wildcards'
+    assert response.status_code == 200
+
+    response = client.get(
+        '/configs/tags_x.json',
+        headers={
+            'Authorization': (
+                f"Bearer {tokens['test-user']}"
+            ),
+        },
+        environ_base={'REMOTE_ADDR': '192.168.1.34'}
+    )
+    assert response.status_code == 403
+    assert response.get_json()['error']['id'] == 'unauthorized-path'
+
+    response = client.get(
         '/configs/host-name',
         headers={
             'Authorization': (

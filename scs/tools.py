@@ -5,6 +5,7 @@ SCS
 """
 import importlib
 from string import Formatter
+import re
 
 from typing import Any
 
@@ -51,3 +52,32 @@ def get_referenced_fields(format_string: str) -> set[str]:
             fields.add(field)
 
     return fields
+
+
+# Match wildcard characters that are not escaped
+_wildcard_pattern = re.compile(r'(?<!\\)\\\*')
+
+
+def contains_wildcard(path: str) -> bool:
+    """Check if the path contains a wildcard"""
+    return bool(_wildcard_pattern.search(re.escape(path)))
+
+
+def build_pattern_from_path(wildcard_path: str) -> re.Pattern:
+    """
+    Builds a regex pattern based on a path string that contais a wildcard
+    character (*)
+
+    Args:
+        wildcard_path:
+            For example '/configs/*.json'. To excape wildcard characters,
+            prefix them by a backslash (\\).
+
+    Returns:
+        The compiled regex to match paths against
+    """
+    regex_escaped = re.escape(wildcard_path)
+    wildcard_converted = _wildcard_pattern.sub('(.*)', regex_escaped)
+    non_wildcard_normalized = wildcard_converted.replace(r'\\\*', r'\*')
+    regex_str = f"^{non_wildcard_normalized}$"
+    return re.compile(regex_str, re.IGNORECASE)
