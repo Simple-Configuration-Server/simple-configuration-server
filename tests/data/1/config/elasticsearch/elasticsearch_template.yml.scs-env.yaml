@@ -1,0 +1,10 @@
+template:
+  enabled: false
+
+response:
+  headers:
+    Content-Type: 'text/plain'
+
+request:
+  methods:
+    - GET

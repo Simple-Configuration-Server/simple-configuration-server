@@ -1,0 +1,13 @@
+cluster.name: {{ cluster_name }}
+node.name: '{{ node_name }}'
+path.data: /data/elasticsearch/data
+path.logs: /data/elasticsearch/logs
+network.host:
+{% for host in hosts %}
+  - {{ host }}
+{% endfor %}
+http.port: {{ http_port }}
+discovery.type: single-node
+xpack.security.enabled: true
+password: "{{ password }}"
+main: {{ main_host }}

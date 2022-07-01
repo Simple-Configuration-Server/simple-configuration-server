@@ -9,7 +9,8 @@ import logging
 import os
 
 from flask import (
-    Blueprint, request, g, make_response, abort, current_app, Response
+    Blueprint, request, g, make_response, abort, current_app, Response,
+    send_from_directory,
 )
 from flask.blueprints import BlueprintSetupState
 import fastjsonschema
@@ -353,26 +354,30 @@ def view_config_file(path: str) -> Response:
 
     secret_ids = yaml.serialize_secrets(env)
 
-    if rendering_options := env['template']['rendering_options']:
-        # Since some options seem to erroneously not be supported, these are
-        # applied later
-        # https://github.com/pallets/jinja/issues/1645
-        # Test the removal of this after jinja2>=3.1.2 is released
-        unsupported_options = {}
-        for key in _MISSING_OVERLAY_OPTIONS:
-            if key in rendering_options:
-                unsupported_options[key] = rendering_options.pop(key)
-        jinja_env = current_app.jinja_env.overlay(**rendering_options)
-        for key, value in unsupported_options.items():
-            setattr(jinja_env, key, value)
+    if env['template']['enabled']:
+        if rendering_options := env['template']['rendering_options']:
+            # Since some options seem to erroneously not be supported, these
+            # are applied later
+            # https://github.com/pallets/jinja/issues/1645
+            # Test the removal of this after jinja2>=3.1.2 is released
+            unsupported_options = {}
+            for key in _MISSING_OVERLAY_OPTIONS:
+                if key in rendering_options:
+                    unsupported_options[key] = rendering_options.pop(key)
+            jinja_env = current_app.jinja_env.overlay(**rendering_options)
+            for key, value in unsupported_options.items():
+                setattr(jinja_env, key, value)
+        else:
+            jinja_env = current_app.jinja_env
+
+        template = jinja_env.get_template(path.lstrip('/'))
+        rendered_template = template.render(env['template']['context'])
+
+        response = make_response(rendered_template)
+        response.headers.clear()  # Remove the default 'html' content type
     else:
-        jinja_env = current_app.jinja_env
+        response = send_from_directory(_config_basepath, path)
 
-    template = jinja_env.get_template(path.lstrip('/'))
-    rendered_template = template.render(env['template']['context'])
-
-    response = make_response(rendered_template)
-    response.headers.clear()  # Remove the default 'html' content type
     response.headers.update(env['response']['headers'])
     response.status = env['response']['status']
 

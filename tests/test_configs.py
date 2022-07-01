@@ -135,3 +135,28 @@ def test_post_malformed():
     )
     # First ensure the path is not simplified during the request
     assert response.status_code == 400
+
+
+def test_without_templating():
+    """
+    Test if disabling the templating for a specific endpoint works
+    """
+    response = client.get(
+        '/configs/elasticsearch/elasticsearch_template.yml',
+        headers={
+            'Authorization': (
+                f"Bearer {tokens['test-user']}"
+            ),
+        },
+        environ_base={'REMOTE_ADDR': '192.168.1.34'},
+    )
+    assert response.status_code == 200
+
+    # Check contents
+    actual_path = Path(
+        config_dir, 'config/elasticsearch/elasticsearch_template.yml'
+    )
+    with open(actual_path, 'r', encoding='utf8') as textfile:
+        file_text = textfile.read()
+
+    assert response.text == file_text

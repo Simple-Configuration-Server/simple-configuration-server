@@ -7,6 +7,7 @@ properties:
     default:
       context: {}
       rendering_options: {}
+      enabled: true
     additionalProperties: false
     properties:
       context:
@@ -22,6 +23,12 @@ properties:
           jinja_env for the endpoint, that updates the default rendering options
           with the provided rendering options
         default: {}
+      enabled:
+        type: boolean
+        default: true
+        description:
+          By setting this to false, you can disable template rendering for this
+          endpoint, meaning the server will return the file as-is
   request:
     type: object
     default:
