@@ -119,6 +119,26 @@ def test_post_request():
     assert response.text == 'new-name'
 
 
+def test_post_schema_validation():
+    """
+    Check if post requests properly update the context
+    """
+    response = client.post(
+        '/configs/elasticsearch/cluster_name',
+        headers={
+            'Authorization': (
+                f"Bearer {tokens['test-user-2']}"
+            ),
+        },
+        environ_base={'REMOTE_ADDR': '192.168.1.34'},
+        json={'cluster_way': 'wrongvalue'},
+    )
+    # First ensure the path is not simplified during the request
+    assert response.status_code == 400
+    rdata = response.get_json()
+    assert rdata['error']['id'] == 'request-body-invalid'
+
+
 def test_post_malformed():
     """
     A 400 error should be returned, if malformed json is sent

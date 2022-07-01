@@ -1,0 +1,8 @@
+request:
+  schema:
+    type: object
+    required:
+      - cluster_name
+    properties:
+      cluster_name:
+        type: string

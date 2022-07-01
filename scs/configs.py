@@ -35,6 +35,13 @@ _AUDIT_EVENTS = [
     ),
 ]
 
+_ERRORS = [
+    (
+        400, 'request-body-invalid',
+        'Your request body doesn\'t match the configured schema',
+    )
+]
+
 # Load the schema, and use this to populate the default values of the ENV
 _env_file_schema_path = Path(
     Path(__file__).absolute().parent,
@@ -109,11 +116,16 @@ def init(setup_state: BlueprintSetupState):
         )
     for audit_event_args in _AUDIT_EVENTS:
         register_audit_event(*audit_event_args)
+    for error_args in _ERRORS:
+        errors.register(*error_args)
 
     if enable_env_cache or check_templates:
         relative_config_template_paths = get_relative_config_template_paths()
         for relative_url in relative_config_template_paths:
             env = _load_env(relative_url.lstrip('/'))
+            # If request.schema is defined, check if it's able to parse
+            if env['request']['schema']:
+                fastjsonschema.compile(env['request']['schema'])
             if check_templates and env['template']['enabled']:
                 yaml.serialize_secrets(env)
                 template = setup_state.app.jinja_env.get_template(
@@ -350,6 +362,13 @@ def view_config_file(path: str) -> Response:
         abort(405)
 
     if request.method == 'POST':
+        body = request.get_json(force=True)
+        if env['request']['schema']:
+            try:
+                body = fastjsonschema.validate(env['request']['schema'], body)
+            except fastjsonschema.JsonSchemaValueException:
+                abort(400, description={'id': 'request-body-invalid'})
+
         env['template']['context'].update(request.get_json(force=True))
 
     secret_ids = yaml.serialize_secrets(env)
