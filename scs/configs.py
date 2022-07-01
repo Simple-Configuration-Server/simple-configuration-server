@@ -118,7 +118,7 @@ def init(setup_state: BlueprintSetupState):
                 template = setup_state.app.jinja_env.get_template(
                     relative_url.lstrip('/')
                 )
-                template.render(**env)
+                template.render(**env['template']['context'])
 
 
 def _configure_yaml_loaders(
