@@ -1,8 +1,7 @@
-users:
-  - id: test-user
-    token: !scs-secret 'scs-tokens.yaml#test-user'
-    has_access:
-      to_paths:
-        - /configs/elasticsearch/*
-      from_networks:
-        - 127.0.0.1
+- id: test-user
+  token: !scs-secret 'scs-tokens.yaml#test-user'
+  has_access:
+    to_paths:
+      - /configs/elasticsearch/*
+    from_networks:
+      - 127.0.0.1

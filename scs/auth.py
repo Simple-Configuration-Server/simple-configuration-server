@@ -165,7 +165,7 @@ def init(setup_state: BlueprintSetupState):
 
     # Create the mapping
     _auth_mapping = {}
-    for user in scs_users['users']:
+    for user in scs_users:
         _auth_mapping[user.pop('token')] = user
         parsed_whitelist = []
         for item in user['has_access']['from_networks']:
