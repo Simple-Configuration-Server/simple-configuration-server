@@ -1,3 +1,19 @@
+# Perform tests before build. If tests fail, image will not be build
+stages:
+  - test
+  - build
+
+run_tests:
+  stage: test
+  image: python:3.10
+  script:
+    - ./install.dev.sh
+    - source .env/bin/activate
+    - ./test.sh
+  only:
+    - tags
+  timeout: 2 minutes
+
 build_docker_image:
   stage: build
   image: docker:20
