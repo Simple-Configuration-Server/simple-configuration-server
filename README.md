@@ -339,7 +339,7 @@ layout:
     >   - value2
 ```
 These can be referenced from scs-env files, like:
-```YAML
+```yaml
 template:
   context:
     object: !scs-common 'global.yaml#global_object'
@@ -370,7 +370,7 @@ the secrets directory.
 ### 2.4 Server Configuration (scs-configuration.yaml)
 The scs-configuration.yaml file defines the configuration of the server itself.
 The following is an example of a complete configuration:
-```YAML
+```yaml
 directories:  # Discussed in secions 2.1 to 2.3
   common: !scs-expand-env ${SCS_CONFIG_DIR}/common
   config: !scs-expand-env ${SCS_CONFIG_DIR}/config
@@ -545,7 +545,7 @@ authentication (default). As mentioned in section 2.4.4 you can set the
 location of this file inside the scs-configuration.yaml file.
 
 A singe-user scs-users.yaml would look like:
-```YAML
+```yaml
 - id: example-user
   token: !scs-secret 'scs-tokens.yaml#example-user'
   has_access:
@@ -576,7 +576,7 @@ respositories, to validate if configurations are valid, by loading the server,
 and testing the responses of each endpoint.
 
 Below is a full example of this file:
-```YAML
+```yaml
 endpoints:
   /configs/cluster_name: false
   /configs/custer_name_redirect:
@@ -669,10 +669,10 @@ There are two ways to use the SCS to host your configuration:
 2. By cloning this repository and installing SCS locally
 
 Because of it's simplicitly and ease of updating, deploying SCS using Docker
-is the preferred way to deploy the SCS.
+is the preferred method. Local installation is not recommended.
 
 ### 3.1 Docker
-The SCS Docker image is published in the GitLab Container Registry for the
+The SCS Docker image is published in the GitLab Container Registry of this
 repository.
 
 The simplest way to deploy the SCS with your configuration is to
@@ -695,6 +695,7 @@ services:
       - ./.local/ssl/cert-chain.crt:/etc/ssl/certs/scs.crt
       - ./.local/ssl/private-key.key:/etc/ssl/private/scs.key
     environment:
+      - SCS_CONFIG_DIR=/etc/scs/configuration
       # The following can be ommitted, since it's the default value. It's
       # recommended to only disable SSL when using a reverse proxy, like NGINX,
       # for SSL termination
@@ -708,3 +709,35 @@ illustrated in the [example-scs-configuration](https://gitlab.com/Tbro/example-s
 repository.
 
 ### 3.2 Local Installation
+Although not recommended, you can install SCS locally, by cloning this
+repository. Below is a basic example of using uWSGI to run the application.
+You will need:
+
+* A unix operating system (Windows should work, but not with below steps)
+* Python 3.10 needs to be installed (Test using `python3.10 --version`)
+
+Now:
+1. Create a .local subdirectory: `mdkir -p .local`
+2. Create an app.py file inside the .local directory, with the following
+   contents:
+    ```python
+    import scs
+
+    app = scs.create_app()
+    ```
+3. Open a terminal (bash) in the root directory of this repository, and do:
+    ```bash
+    ./install.sh
+    source .env/bin/activate
+    pip install uwsgi
+    export PYTHONPATH=$(pwd)
+    # Choose appropriate directories, make sure they exist
+    export SCS_CONFIG_DIR=/etc/scs
+    export SCS_LOG_DIR=/var/log/scs
+    # Now start the app from uWSGI
+    cd .local
+    uwsgi -s /tmp/scs.sock --manage-script-name --mount /=app:app
+    ```
+
+uWSGI should now be running the SCS application. For further documentation, for
+example on how to configure NGINX, please look at the [Flask documentation](https://flask.palletsprojects.com/en/2.0.x/deploying/uwsgi/).
