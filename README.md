@@ -699,6 +699,9 @@ services:
       # private key
       - ./.local/ssl/cert-chain.crt:/etc/ssl/certs/scs.crt
       - ./.local/ssl/private-key.key:/etc/ssl/private/scs.key
+      # Use a docker-volume for the logs (In case you use e.g. Filebeat, as
+      # Described in section 3.3)
+      - scs-logs:/var/log/scs
     environment:
       - SCS_CONFIG_DIR=/etc/scs/configuration
       # The following 2 variables can be omitted if the default values are
@@ -756,6 +759,40 @@ Then:
 
 uWSGI should now be running the SCS application. For further documentation, for
 example on how to configure NGINX, please look at the [Flask documentation](https://flask.palletsprojects.com/en/2.0.x/deploying/uwsgi/).
+
+### 3.3 Log Centralization
+The [examples/filebeat folder](examples/filebeat/) contains a Docker
+configuration for using Filebeat to stream SCS logs to an ElasticSearch
+instance. Use the [Dockerfile](examples/filebeat/dockerfile) to build a
+container image based on the official Filebeat Docker image, that
+additionally includes:
+* An 'scs' Filebeat Module
+* Fields.yml configuration for SCS log contents
+
+In the [file thats appended to fields.yml](examples/filebeat/fields.APPEND.yml)
+you can see the names of the fields that are created by the
+[SCS filebeat module](examples/filebeat/module/scs/), and used in ElasticSearch,
+in addition to the default ECS field names. The
+[configuration file for the module](examples/filebeat/modules.d/scs.yml)
+can be changed to disable/enable streaming of specific logs, and change their
+paths inside the container. To built the image, run:
+```bash
+docker build . -t filebeat-scs
+```
+
+To use it, add the following service to the 'services' section of the
+Docker compose file (Section 3.1):
+```yaml
+filebeat:
+    image: filebeat-scs
+    environment:
+      # See https://www.elastic.co/guide/en/beats/filebeat/8.2/running-on-docker.html
+      # for more configuration options
+      - output.elasticsearch.hosts=${ELASTICSEARCH_HOSTS:?error}
+    volumes:
+      # The logs are shared between the containers using a Docker volume
+      - scs-logs:/var/log/scs
+```
 
 ## 4 Development
 This section discusses how to work on the SCS core or Docker container

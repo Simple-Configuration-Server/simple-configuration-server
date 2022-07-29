@@ -1,4 +1,4 @@
-FROM docker.elastic.co/beats/filebeat:8.2.2-amd64
+FROM docker.elastic.co/beats/filebeat:8.3.3-amd64
 COPY --chown=root:root ./modules.d/scs.yml /usr/share/filebeat/modules.d/scs.yml
 COPY --chown=root:root ./module/scs /usr/share/filebeat/module/scs
 COPY ./fields.APPEND.yml /tmp/fields.APPEND.yml
