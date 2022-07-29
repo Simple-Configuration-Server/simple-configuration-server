@@ -132,10 +132,8 @@ illustrating some of the basic features of the SCS:
 |   >           directories:
 |   >               secrets: *secrets-dir
 |   >           networks:
-|   >               private_only: true
 |   >               whitelist:
 |   >                  - 127.0.0.1/32
-|   >           max_auth_fails_per_15_min: 10
 |
 └── scs-users.yaml  # User definitions used by the scs.auth module
     > - id: example-user
@@ -519,21 +517,22 @@ using the `!scs-secret` YAML tag inside the scs-users.yaml file. If you want
 to use the same folder when other secrets are kept, you can simply use a YAML
 anchor, as illustrated in the example.
 
-`auth.options.networks.private_only` can be set to 'true' to ensure data
+`auth.options.networks.private_only` is 'true' by default, and ensures data
 on the server can only be accessed from internal subnets.
 `auth.options.networks.whitelist` must be set, to indicate what IPs or subnets
 are allowed to access the server. It's advised to define this as restrive as
 possible. Please note that regardless of these settings, it's a good idea to
 use a firewall to controll access to the server. Although unauthorized IPs are
-not authorized to access any data, their requests can still flood the server, possibly causing denial of service.
+not authorized to access any data, their requests can still flood the server,
+possibly causing denial of service.
 
 The `auth.options.max_auth_fails_per_15_min` defines the maximum number of
-requests allowed per IP address with false authentication credentials. In
-combination with the network whitelist, this should reduce the chances of
-successfully brute-forcing the user authentication system. Even if attackers
-can spoof all IP addresses, this will limit the authentication attempts per 15
-minutes to the value of this property times the size of your whitelisted
-network(s).
+requests allowed per IP address with false authentication credentials (10
+by default). In combination with the network whitelist, this should reduce the
+chances of successfully brute-forcing the user authentication system. Even if
+attackers can spoof all IP addresses, this will limit the authentication
+attempts per 15 minutes to the value of this property times the size of your
+whitelisted network(s).
 
 #### 2.4.5 Extensions Configuration
 You can define extensions to load at run-time, to extend the core-functionality

@@ -201,16 +201,55 @@ properties:
         description:
           This object will be passed as the .options attribute for the
           BlueprintSetupState
-        examples:
-          # The configuration parameters used by the default scs.auth module
-          - users_file: /etc/scs/scs-users.yaml
+    if:
+      properties:
+        blueprint:
+          const: scs.auth.bp
+    then:
+      # Validate built-in module options, and apply defaults
+      properties:
+        options:
+          required:
+            - users_file
+            - directories
+            - networks
+          additionalProperties: false
+          properties:
+            users_file:
+              type: string
+              description: Path of yaml file with user definitions
             directories:
-              secrets: /var/scs/application-secrets/
+              type: object
+              additionalProperties: false
+              required:
+                - secrets
+              properties:
+                secrets:
+                  type: string
+                  description:
+                    Path of the secrets dir to use for secrets in scs-users
+                    file
             networks:
-              private_only: true
-              whitelist:
-                - 127.0.0.1/32
-                - 172.16.134.0/24
+              type: object
+              additionalProperties: false
+              required:
+                - whitelist
+              properties:
+                private_only:
+                  type: boolean
+                  default: true
+                whitelist:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                    description: IP-addresses or CIDR notation subnets
+            max_auth_fails_per_15_min:
+              type: integer
+              default: 10
+              description:
+                Maximum allowed failed authentication attempts per 15
+                minutes, before an IP is rate-limited
   
   extensions:
     description:
