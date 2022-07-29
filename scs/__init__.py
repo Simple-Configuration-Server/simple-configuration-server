@@ -55,7 +55,12 @@ def create_app(configuration: dict = None) -> Flask:
     app.register_blueprint(configs.bp)
 
     # Dynamically Register auth blueprint, and pass the auth config options
-    auth_blueprint = get_object_from_name(auth_config['blueprint'])
+    try:
+        auth_blueprint = get_object_from_name(auth_config['blueprint'])
+    except ValueError:
+        raise ValueError(
+            f"Cannot find auth.blueprint: {auth_config['blueprint']}"
+        )
     app.register_blueprint(
         auth_blueprint,
         **auth_config['options'],
@@ -63,8 +68,15 @@ def create_app(configuration: dict = None) -> Flask:
 
     # Load blueprints (Other extensions loaded inside configs module)
     for bp in configuration['extensions']['blueprints']:
+        try:
+            bp_object = get_object_from_name(bp['name'])
+        except ValueError:
+            raise ValueError(
+                f"Cannot find extensions.blueprint: {bp['name']}"
+            )
+
         app.register_blueprint(
-            get_object_from_name(bp['name']),
+            bp_object,
             **bp.get('options', {})
         )
 

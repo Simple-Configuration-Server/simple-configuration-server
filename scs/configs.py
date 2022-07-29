@@ -207,7 +207,12 @@ def _configure_yaml_loaders(
     if add_constructors:
         for constructor_config in add_constructors:
             constructor_name = constructor_config['name']
-            constructor_class = get_object_from_name(constructor_name)
+            try:
+                constructor_class = get_object_from_name(constructor_name)
+            except ValueError:
+                raise ValueError(
+                    f"Cannot find extensions.constructors: {constructor_name}"
+                )
             options = constructor_config.get('options', {})
             constructor_instance = constructor_class(**options)
             if not isinstance(constructor_instance, yaml.SCSYamlTagConstructor):  # noqa:E501
