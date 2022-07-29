@@ -27,18 +27,26 @@ Other features include:
     3. Additional Flask blueprints
     4. Additional template extensions for Jinja2
 
+This project is developed in the [Python programming language](https://www.python.org/about/)
+using the [Flask Framework](https://flask.palletsprojects.com/), and
+makes extensive use of Flask's default [Jinja templating engine](https://jinja.palletsprojects.com/).
+[PyYAML](https://pyyaml.org/) is used for loading and saving YAML files,
+and [Fast JSON schema](https://horejsek.github.io/python-fastjsonschema/) is
+used to validate loaded files using JSON schemas. The Docker image uses the
+[Cheroot HTTP Server](https://cheroot.cherrypy.dev/en/latest/).
+
 ## 1 Basic Example
 Below is an example directory structure that can be used as input for the SCS,
 illustrating some of the basic features of the SCS:
 ```
 .
-├── common  # Common config variables are referenced using the !scs-common YAML tag
+├── common/  # Common config variables are referenced using the !scs-common YAML tag
 │   └── global.yaml
 |       >   database:
 |       >       host: 172.16.48.55
 |       >       port: 1234
 |
-├── secrets  # Secrets are referenced using the !scs-secret YAML tag
+├── secrets/  # Secrets are referenced using the !scs-secret YAML tag
 │   ├── database-users.yaml
 |   |   >   - username: server-1
 |   |   >     password: password1
@@ -48,8 +56,8 @@ illustrating some of the basic features of the SCS:
 │   └── scs-tokens.yaml
 |       > example-user: example-user-token
 |
-├── config
-│   ├── database
+├── config/
+│   ├── database/
 │   │   ├── create_users.json  # Example of using jinja2 templating
 |   |   |   >   [
 |   |   |   >   {% for user in users %}
@@ -66,7 +74,7 @@ illustrating some of the basic features of the SCS:
 |   |       >       headers:
 |   |       >           Content-Type: application/json
 |   |
-│   └── server1
+│   └── server1/
 │       ├── db-config.json  # Uses common variables and secrets (See scs-env file below)
 |       |   >   {
 |       |   >     "ip": "{{ database.host }}",
@@ -140,7 +148,7 @@ illustrating some of the basic features of the SCS:
 ```
 After setting the SCS_CONFIG_DIR environment variable to the root directory of
 the above and starting SCS, the configuration can be accessed
-using simple HTTP(S) reqeusts:
+using simple HTTP(S) requests:
 
 ```
 > curl http://localhost:5000/configs/database/create_users.json --header "Authorization: Bearer example-user-token"
@@ -177,28 +185,33 @@ be found in the [example-scs-configuration](https://gitlab.com/Tbro/example-scs-
 repository.
 
 ## 2 Configuration
-To serve a set of configuration files/variables using SCS, you will need:
+This section describes how to configure the SCS. To serve a set of
+configuration files/variables using SCS, you will need:
 1. A config directory, containing the files/templates that should be served
-2. A common directory, containing yaml files with common configuration elements (Can be empty)
-3. A secrets directory, containing secrets, such as passwords, used in configuration files (Optional)
+2. A common directory, containing yaml files with common configuration elements
+   (Can be empty)
+3. A secrets directory, containing secrets, such as passwords, used in
+   configuration files (Optional)
 4. scs-configuration.yaml, containing the configuration of the server itself
-5. scs-users.yaml, containing SCS user definitions (Optional; Only if the built-in auth module is used)
-6. scs-validate.yaml, containing configuration to validate configurations (Optional; Only if validate.py is used to validate the configuration)
+5. scs-users.yaml, containing SCS user definitions (Optional; Only if the
+   built-in auth module is used)
+6. scs-validate.yaml, containing the validation script settings (Optional; Only
+   if validate.py is used to validate the configuration)
 
-Examples of these are included in the 'Basic Example' above and included in the
-[example-scs-configuration](https://gitlab.com/Tbro/example-scs-configuration)
+Examples of these are illustrated in the basic example (section 1) and included
+in the [example-scs-configuration](https://gitlab.com/Tbro/example-scs-configuration)
 repository.
 
 ### 2.1 Config Directory
 The contents of this directory are served by the SCS, with the exception of
-files with names that end with 'scs-env.yaml', which contain environment
+files with names that end with 'scs-env.yaml'. These files contain environment
 configurations for specific endpoints, or entire directories. The URL structure
 of the SCS is derived from the folder structure inside your config directory.
 
 #### 2.1.1 *scs-env.yaml Files
 Using scs-env.yaml files is optional, but allows you to configure the
-templating system, limit the allowed requests and control the responses of each
-endpoint. Below is a full example of all options that can be set in a
+templating system, validation of requests and the responses of each endpoint.
+Below is a full example of all options that can be set in a
 *scs-env.yaml file:
 ```yaml
 template:
@@ -228,8 +241,8 @@ response:
   headers:  # Set headers on the response
     Content-Type: text/plain
 ```
-The schema this file should adhere to inclused more extensive descriptions for
-each property, and can be found [here](scs/schemas/scs-env.yaml). Note that
+This files should adhere to the schema found [here](scs/schemas/scs-env.yaml),
+which also includes more extensive descriptions of each proeprty. Note that
 this schema also defines the defaults for each property, used when properties
 are not defined. All properties in scs-env files are optional, but empty
 scs-env files should be omitted.
@@ -269,10 +282,10 @@ Similairly, the following apply to './subdirectory/sub_endpoint2':
 2. './subdirectory/scs-env.yaml'
 3. './subdirectory/sub_endpoint2.scs-env.yaml'
 
-Values of type Object(/dict) of more specific scs-env files update the contents
+Values of type Object (dict) of more specific scs-env files update the contents
 of less specific ones. Values with other data types are replaced, in case a
-more specific scs-env file defines them also. E.g. considering scs-env files for
-'./root_endpoint.json' have the following contents:
+more specific scs-env file defines them also. For example, considering the
+scs-env files for './root_endpoint.json' have the following contents:
 1. **./scs-env.yaml**
    ```yaml
    template:
@@ -311,8 +324,8 @@ response:
 #### 2.1.2 URL structure
 All files inside the config directory are used as server endpoints, except the
 ones with names ending with scs-env.yaml. The files are served under the
-/configs endpoint. The example file structure from 2.1.1 would expose the
-following endpoints:
+/configs endpoint. The example file structure from section 2.1.1 would expose
+the following endpoints:
 ```
 /configs/root_endpoint.json
 /configs/subdirectory/sub_endpoint
@@ -323,8 +336,8 @@ following endpoints:
 Use the 'common' directory to store yaml files with configuration variables
 that should be used by multiple endpoints. In case you're using
 git for version control, you can also checkout [git submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodules)
-in subfolders of this directory, so you can include YAML configuration files
-from other git repositories.
+in subfolders of this directory, which gives you the option to include YAML
+configuration files from other git repositories.
 
 You can reference common variables from scs-env.yaml files, using the
 '!scs-common' YAML tag. For example, given the following common directory
@@ -348,9 +361,9 @@ template:
     array_item: !scs-common 'global.yaml#global_array.[0]'
 ```
 
-_Note: Since dots are used as a level seperator in the relative references,
+_Note: Since dots are used as a level seperator in relative references,
 it's advised not to use keys containing dots in these files. By default, the
-SCS will produce an error on startup if this is the case. If you need keys with
+SCS will raise an error on startup if this is the case. If you need keys with
 dots, disable this check by setting 'environments.reject_keys_containing_dots'
 to false in scs-configuration.yaml (See section 2.4)_
 
@@ -359,7 +372,7 @@ This directory works just like the 'common' directory described above. By
 defining secrets in a seperate directory, you can completely seperate your
 secrets from the configuration files itself, meaning you can safely store
 the rest of the configuration (everything, except the Secrets Directory
-and optionally the User Definitions) in a git repository.
+and optionally also the User Definitions) in a git repository.
 
 Every time a user requests an endpoint that exposes 1 or more secrets, the
 user and the requested secrets are logged in the audit log.
@@ -435,7 +448,7 @@ By default `environments.cache` is true, meaning scs-env.yaml files are only
 loaded once at startup. If you make changes to these files, with this set to
 true, you'll have to restart the server.
 
-The `environments.reject_keys_containing_dots` is discussed in the final
+The `environments.reject_keys_containing_dots` is discussed in the last
 paragraph of section 2.2.
 
 #### 2.4.2 Templates Configuration
@@ -456,11 +469,11 @@ already defines global defaults. If you want to override the defaults, you need
 to specify new values for these. Setting an empty object for this will still
 cause the default settings to be applied. If you need to use alternative
 rendering_options for specific endpoints, you can also define
-`template.rendering_options` in specific scs-env.yaml file, which is used to
-update the globally defined options.
+`template.rendering_options` in scs-env.yaml files, which is used to
+update the globally defined options for specific endpoints.
 
 #### 2.4.3 Logs Configuration
-The SCS creates 2 different logs:
+The SCS creates 2 types of logs:
 1. `audit` logs: These contain audit events of the following types (stored
    in the event.type field):
    * `config-loaded`: An authorized user loaded a config file
@@ -485,7 +498,7 @@ AppLogFormatter and AuditLogFormatter classes in the
 Using the configuration file you can set the logs to either output to a
 file, which is auto-rotated by SCS. Use this in combination with a log
 centralization agent, like Elastic Filebeat, to centralize your logs. For an
-example on how to do this, please see the 'recipes' section below.
+example on how to do this, please see the 'deployment' section.
 
 Alternatively you can simply output the logs to the console, by setting the
 stdout option. In this case you can for example see the logs via the
@@ -523,21 +536,10 @@ minutes to the value of this property times the size of your whitelisted
 network(s).
 
 #### 2.4.5 Extensions Configuration
-By defining extensions, you can further extend the functionality of SCS at
-runtime. The `extensions.constructors` property allows users to define
-additional YAML tag constructors, which can then be used from within
-scs-env.yaml files. An example would be to load a tag constructor that
-retrieves secrets from 3rd party secret stores.
-
-By adding `extensions.blueprints`, additional Flask blueprints can be loaded
-at runtime. Flask blueprints can add functionality to process requests or
-responses, e.g. to add custom logging or add specific headers to responses.
-
-By adding `extensions.jinja2`, you can load extensions to the templating
-system, so you can use custom functions inside the templates.
-
-Development considerations for these extensions are defined in the section
-'Development' of this README.
+You can define extensions to load at run-time, to extend the core-functionality
+of SCS using third party packages. For a description of the different types of
+extensions that are supported, including considerations for development of
+these, see section 4.3.
 
 ### 2.5 User Definitions (scs-users.yaml)
 This file is only required if you're using the builtin `scs.auth` module for
@@ -572,7 +574,7 @@ than `directories.secrets` (though you can set these to the same value).
 This configuration file does not apply to the server itself, but to the
 [validate.py script](docker/validate.py). This script is included inside the
 SCS docker image, and is aimed to be used inside CI/CD pipelines of
-respositories, to validate if configurations are valid, by loading the server,
+repositories to validate if configurations are valid, by loading the server,
 and testing the responses of each endpoint.
 
 Below is a full example of this file:
@@ -647,19 +649,18 @@ in the longer pattern/url (more specfic) override settings in the shorter
 pattern/url(less specific). In the above example, `/configs/test.yaml` both
 matches the pattern as the specific configuration. This means (1) the yaml
 format is validated, (2) the Content-Type response header is validated and (3)
-the contents are compared to the object given for the 'yaml:' key. (In this
-specific case, point 3 would already have enabled the 'format' validation also)
+the contents are compared to the object given for the 'yaml:' key.
 
 #### 2.6.2 SCS Configuration
 The `scs_configuration` property allows you to override parts of
 'scs-configuration.yaml' during validation. The following changes are
 applied by default: (1) logs are directed to stdout and  (2) the auth blueprint
-is disabled. You can override this default logging configuration for the
+is disabled. You can override the default logging configuration for the
 validation script by defining a custom `scs_configuration.logs` property.
 
-You can also use this property as illustrated at the top, to override custom
-YAML tag constructors, e.g. in case you've specified a cloud-dependent
-constructor in your default configuration. Note the the built-in `!scs-secret`
+You can also use this property, as illustrated in the example, to override
+custom YAML tag constructors, for example when you're using a cloud-dependent
+constructor in your configuration. Note that the built-in `!scs-secret`
 tag is overriden by default during validation (it generates random strings) so
 secrets are not required for validation.
 
@@ -671,6 +672,10 @@ There are two ways to use the SCS to host your configuration:
 Because of it's simplicitly and ease of updating, deploying SCS using Docker
 is the preferred method. Local installation is not recommended.
 
+In addition to deploying SCS, you can also use logging agents to stream the
+logs to a central logging database. Section 3.3 includes an example
+where Elastic Filebeat is used to stream the logs to ElasticSearch.
+
 ### 3.1 Docker
 The SCS Docker image is published in the GitLab Container Registry of this
 repository.
@@ -678,7 +683,7 @@ repository.
 The simplest way to deploy the SCS with your configuration is to
 use the Docker-image as-is, and use bind-mounts to set your configuration and
 SSL keys on it, as illusted in the below example docker-compose.yml file:
-```
+```yaml
 version: "3.9"
 
 services:
@@ -696,15 +701,25 @@ services:
       - ./.local/ssl/private-key.key:/etc/ssl/private/scs.key
     environment:
       - SCS_CONFIG_DIR=/etc/scs/configuration
-      # The following can be ommitted, since it's the default value. It's
-      # recommended to only disable SSL when using a reverse proxy, like NGINX,
-      # for SSL termination
+      # The following 2 variables can be omitted if the default values are
+      # used.
+      #
+      # It's recommended to only disable SSL when using a reverse proxy,
+      # like NGINX, for SSL termination
       - SCS_DISABLE_SSL=0
+      #
+      # Set the reverse proxy count >= 1 if you're using a reverse proxy that
+      # sets the X-Forwarded-For header. This means the 'X-Forwarded-For'
+      # header is used as the Remote Address, rather than the IP of the proxy
+      # itself. The count indicates how many values should be in the
+      # X-Forwarded-For headers. If you use multiple proxies, this may be
+      # higher than one.
+      - SCS_REVERSE_PROXY_COUNT=0
     ports:
       - 3000:80
 ```
 Alternatively, you can use CI/CD inside your configuration data repository to
-build an image that includes the configuration (except the secrets) as
+build an image that includes your configuration (except the secrets) as
 illustrated in the [example-scs-configuration](https://gitlab.com/Tbro/example-scs-configuration)
 repository.
 
@@ -716,7 +731,7 @@ You will need:
 * A unix operating system (Windows should work, but not with below steps)
 * Python 3.10 needs to be installed (Test using `python3.10 --version`)
 
-Now:
+Then:
 1. Create a .local subdirectory: `mdkir -p .local`
 2. Create an app.py file inside the .local directory, with the following
    contents:
@@ -741,3 +756,353 @@ Now:
 
 uWSGI should now be running the SCS application. For further documentation, for
 example on how to configure NGINX, please look at the [Flask documentation](https://flask.palletsprojects.com/en/2.0.x/deploying/uwsgi/).
+
+## 4 Development
+This section discusses how to work on the SCS core or Docker container
+configuration, as well as how extensions or a 3rd party auth blueprint for the
+SCS can be developed.
+
+_(Note: For the process and checklist of contributing changes to this
+repository, please see [CONTRIBUTING.md](CONTRIBUTING.md))_
+
+### 4.1 SCS Core
+
+#### 4.1.1 Preparation
+To work on the core SCS code, you'll need to:
+
+* A unix operating system (Windows should also work, but not using these steps)
+* Python 3.10 installed (Test using `python3.10 --version`)
+
+After cloning the repository locally:
+1. Open a terminal in the root directory
+2. Enable the githooks: `./enable_githooks.sh`. This ensures tests are run on
+   commit
+3. Run `./install.dev.sh` to install the Python virtual environment for
+   development
+4. Activate the environment: `source .env/bin/activate`
+5. You should now be able to run the development server, e.g. using one of the
+   test configurations:
+    ```bash
+    export SCS_CONFIG_DIR=$(pwd)/tests/data/1
+    mkdir -p /var/log/scs
+    export SCS_LOG_DIR=/var/log/scs
+    export FLASK_APP=scs
+    export FLASK_ENV=development
+    flask run
+    ```
+#### 4.1.2 Structure
+The SCS code is structured as a Python package inside the 'scs' directory of
+this repository. The main entrypoint for the server is the scs.create_app()
+function, which is a factory function for the Flask App. The SCS code is
+divided over the following modules:
+* [auth.py](scs/auth.py) contains the Flask blueprint for the built-in
+  Authentication/Authorization system.
+* [configs.py](scs/configs.py) contains the Flask blueprint with the main
+  application logic such as the Flask view function responsible for loading and
+  rendering the configuration files/templates.
+* [errors.py](scs/errors.py) contains the Flask blueprint that error handling
+  logic for SCS, such as formatting error responses as JSON rathern than HTML.
+  (See section 4.3.1 for how to register and send error responses)
+* [logging.py](scs/logging.py) contains the logging configuration, including
+  Formatters for both the application and audit logs. (See section 4.3.2 for
+  how to log to use the audit and application logs)
+* [tools.py](scs/tools.py) contains common functions used throughout the SCS
+  package
+* [yaml.py](scs/yaml.py) contains the logic for YAML loading, including the
+  default YAML constructors used by SCS. TODO: REFERENCE
+
+User configuration files are validated during loading using the JSON schemas in
+the 'scs/schemas' directory. If you want to add support for new properties to
+any of these files, the schema needs to be updated.
+
+Note that the schema also contains defaults for optional properties. The
+fastjsonschema package used by SCS ensures that these defaults are
+used in case the optional properties are not defined. For example, the
+_DEFAULT_ENV inside [configs.py](scs/configs.py) is loaded directly from the
+[scs-users.yaml schema](scs/schemas/scs-users.yaml), by validating an empty
+dictionary. Changing any default settings should preferably be done by changing
+the JSON-schema only.
+
+#### 4.1.3 Testing
+If you make any changes to the code, please add to or update the tests
+accordingly.
+
+The tests for the SCS package are defined in the 'tests' directory, and can
+be run using pytest. Please note that it's not possible to simply run
+the `pytest` command, which loads all test files at once. Because the SCS
+package uses global variables to store configuration, this will cause conflicts.
+Therefore pytest should be run on each test_*.py file seperatly. The easiest
+way to do this, is to run the test.sh script which also does some more
+consistency checks:
+```bash
+# In case the environment is not installed or up-to-date
+./install.dev.sh
+source .env/bin/activate
+# Run all tests:
+./test.sh
+```
+
+Run the `./enable_githooks.sh` once to make sure the pre-commit githook of the
+repository is run on commit. This runs the same code as above.
+
+All test files simply load the Flask app using one of the test configurations
+found in the 'tests/data' directory. If you need to generate output files from
+the tests, e.g. to test the logging, create a 'temp' directory (See e.g.
+[test_logging.py](tests/test_logging.py)). Since it's in the .gitignore
+file, the temp directory is never comitted.
+
+### 4.2 Docker Image
+Assests specific to the Docker Image are inside the 'docker' directory. These
+include:
+* [config/](docker/config/): Directory containing a sample/default configuration that's
+  copied to the Docker image
+* [server.py](docker/server.py): Simple Python application that uses the
+  cheroot HTTP server to serve the application.
+* [validate.py](docker/validate.py): Python application that loads creates the
+  Flask app with the user-configuration, and tests if all endpoints are
+  working.
+* [scs-validate.SCHEMA.yaml](docker/scs-validate.SCHEMA.yaml): The JSON schema
+  to validate the configuration file of validate.py against. As described in
+  4.1.2, the default property values are included in the JSON schema, and are
+  loaded if certain properties, or the entire file, is omitted.
+
+The default command of the Docker image is to start the server, as
+configured in the [Dockerfile](Dockerfile). Users can change the command to
+`python validate.py` to use the same image to validate their configuration
+repository contents. The Docker image for this repository is built with CI/CD
+(See configuration [here](.gitlab-ci.yml)) when git tags are pushed to GitLab.
+
+### 4.3 Extensions
+The SCS is designed to be extended with additional functionality at runtime.
+The following types of extensions are supported:
+
+* **YAML Constructors**: YAML constructors allow you to add support for
+  additional YAML tags to the SCS. Imagine for example you'd want to include
+  secrets from a 3rd party secret store in your scs-env.yaml file, you can
+  create a constructor that uses a tag like `!third-party-secret` to
+  refer to these secrets. Users can pass initialization options to constructors
+  from the configuration file, such as credentials for a third party service
+  used by the contructor.
+* **Flask Blueprints**: Flask Blueprints allow you to add functionality to the
+  request/response handling of the system, for example to create custom
+  request logs, or add CORS support to the system.
+* **Jinja Extensions**: Jinja extensions allow you to add functions that can
+  be used within configuration file templates.
+
+The development of each of these extensions is described in sections 4.3.3 to
+4.3.5. These extensions can also make use of existing SCS functions, for
+example to ensure properly formatted errors are returned in a JSON response
+(4.3.1) and to use the builtin logging functionality (4.3.2).
+
+#### 4.3.1 Custom Error Responses
+Use the [scs.errors](scs/errors.py) module from inside other modules to add
+custom error responses to SCS. There are 2 types of errors that can be
+registered with the scs.errors module:
+1. Errors based on response codes and error IDs, triggered using abort()
+2. Errors based on Exceptions raised in the code
+
+You can use the first type to explicitly return errors for certain conditions,
+by:
+1. Registering the status code, error id and error message combination
+   with the scs.errors module:
+    ```python
+    from scs import errors
+
+    errors.register(
+      code=429,
+      id_='auth-rate-limited',
+      message='Rate limited due to too many false auth attempts from this ip',
+    )
+    ```
+2. Using the flask.abort function somewhere in your code:
+   ```python
+   from flask import abort
+
+   abort(429, description={'id': 'auth-rate-limited'})
+   ```
+
+The second option is to capture exceptions that are raised inside the code, and
+return a 500 error message with an explaination:
+1. Create a custom error class (optional) and register it (or alternatively,
+   register existing exceptions):
+    ```python
+    from scs import errors
+
+    class CustomException(Exception):
+      pass
+
+    errors.register_exception(
+      exception_class=CustomException,
+      id_='custom-exception-occurred',
+      message='A custom exception occured'
+    )
+2. Raise the exception:
+    ```python
+    raise CustomException('Exception occured')
+    ```
+
+In this case a 500 status code is returned when the exception is encountered,
+and the provided id and message are returned as JSON.
+
+Note that it's good practice to include your package name inside the error id,
+since otherwise these may overlap with errors registered by other modules. For
+further examples on how to use the above error handling, also take a look at
+the SCS source code, since errors and exceptions are registered by multiple
+built-in SCS modules.
+
+#### 4.3.2 Using Logging
+The [scs.logging](scs/logging.py) module enables you to:
+1. Log custom audit events
+2. Log to the SCS application log
+
+To log custom audit events:
+1. Add a custom audit event:
+    ```python
+    from scs import logging
+
+    logging.register_audit_event(
+      type_="custom-audit-event",
+      level='INFO',
+      message_template="User '{user}' has done {terrible_thing}"
+    )
+2. Use the 'add_audit_event' function added to the Flask.g object:
+    ```python
+    from Flask import g
+
+    g.add_audit_event(
+        event_type='custom-audit-event',
+        # Any keyword arguments other the event_type can be used inside the
+        # message template
+        terrible_thing="something aweful",
+    )
+    ```
+
+Note that, as with error ids, it's advised to include your package name into
+the 'event_type' to prevent overlap with other extensions.
+
+To log to the SCS application log, use the application logger:
+```python
+from Flask import current_app
+
+current_app.logger.info('Logged at info level')
+```
+
+#### 4.3.3 YAML Constructors
+If you develop YAML constructors, make sure that these inherit from the
+SCSYamlTagConstructor class. Inside the constructor you can access the
+path of the file itself, and change the 'resave' value on the loader,
+to trigger SCS to resave a file with the constructed values (E.g. in case the
+!scs-gen-secret tag is used, a secret is generated, and then saved in place of
+the tag). A simple example:
+```python
+from scs.yaml import SCSYamlTagConstructor
+
+class AddOwnPathConstructor(SCSYamlTagConstructor):
+    """
+    A YAML tag that is replaced by the path of the file itself
+
+    Attributes:
+      resave: Whether to save the generated value back to the file
+    """
+    # Note that self.tag can also be made dynamic, by setting it as input to
+    # the init function
+    tag = '!set-own-path'
+
+    def __init__(self, *args, resave: bool, **kwargs):
+        self.resave = resave
+        super().__init__(*args, **kwargs)
+
+    def construct(self, loader: Loader, node: Node) -> Any:
+        # If resave is true, replace tag with value on first load.
+        # Note that the 'resave' option removes any comments and additional
+        # whitespace from the YAML file
+        if self.resave:
+          # Prevent setting it to false when self.resave=False, because another
+          # constructor may have set it to True already...
+          loader.resave = True
+        return loader.filepath.as_posix()
+```
+
+This is confired from scs-configuration.yaml like:
+```yaml
+extensions:
+  constructors:
+    - name: mypackage.AddOwnPathConstructor
+      options:
+        resave: false
+```
+
+#### 4.3.4 Flask Blueprints
+Any Flask Blueprint can be added from the extensions configuration. Use an
+initialization function with the `bp.record` decorator, to capture any
+options that are passed. A simple example:
+```python
+from flask import Blueprint
+
+bp = Blueprint('custom-blueprint')
+
+@bp.record
+def init(setup_state: BlueprintSetupState):
+    global blueprint_name
+    opts = setup_state.options
+    blueprint_name = opts['name']
+
+@bp.after_app_request
+def print_something(response: Response) -> Response:
+    print(f'{blueprint_name}: This is executed after the app request')
+    return response
+```
+
+This is configured from scs-configuration.yaml like:
+```yaml
+extensions:
+  blueprints:
+    - name: mypackage.mymodule.bp
+      options:
+        name: 'Great Blueprint!'
+```
+
+#### 4.3.5 Jinja Extensions
+Note that, due to the design of Jinja extensions (See [docs](https://jinja.palletsprojects.com/en/3.0.x/extensions/#writing-extensions)), it's not possible to pass options to the
+init method of an extension. However, by using the `templates.rendering_options`
+property in scs-configuration.yaml, and/or  `template.rendering_options` in
+scs-env files, users can extend the environment attributes, which can then be
+used inside the extension. As a basic example:
+```python
+from jinja2.ext import Extension
+import functools
+
+def add_suffix(str_: str, *, suffix: str) -> str:
+    """
+    Add a suffix the end of a string
+    """
+    return str_ + suffix
+
+
+class AddSuffixExtension(Extension):
+    """
+    Simple Extension that adds SCS to the end of a phrase
+    """
+    def __init__(self, environment):
+        super().__init__(environment)
+        suffix = environment.suffix_for_string
+        environment.filters['add_suffix'] = functools.partial(
+          add_suffix, suffix=suffix
+        )
+```
+
+This is configured from scs-configuration.yaml like:
+```yaml
+templates:
+  rendering_options:
+    suffix_for_string: ' is the best!'
+
+extensions:
+  jinja2:
+    - name: mypackage.AddSuffixExtension
+```
+
+### 4.4 Auth Blueprint
+The same considerations as for blueprint extensions (section 4.3.4) apply to
+developing an Auth Blueprint. You can use the built-in [scs.auth module](scs/auth.py)
+source code as inspiration.

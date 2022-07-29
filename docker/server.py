@@ -30,7 +30,7 @@ def get_environment_config() -> dict:
         SCS_REVERSE_PROXY_COUNT:
             Set to >= 1 if you're using a reverse proxy that sets the
             X-Forwarded-For header. This means the 'X-Forwarded-For' header is
-            used as the Remote Address, rather than the IP of th proxy itself.
+            used as the Remote Address, rather than the IP of the proxy itself.
             The count indicates how many values should be in the
             X-Forwarded-For headers. If you use multiple proxies, this may be
             higher than one. (default: 0)
