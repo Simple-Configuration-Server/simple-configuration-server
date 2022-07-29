@@ -41,7 +41,7 @@ def add_scs_suffix(str_: str) -> str:
 
 class AddSCSExtension(Extension):
     """
-    Simple Extension that converts a given phrase to lowercase
+    Simple Extension that adds SCS to the end of a phrase
     """
     def __init__(self, environment):
         super().__init__(environment)

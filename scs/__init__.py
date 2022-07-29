@@ -61,14 +61,12 @@ def create_app(configuration: dict = None) -> Flask:
         **auth_config['options'],
     )
 
-    # Load blueprint & jinja2 extensions
+    # Load blueprints (Other extensions loaded inside configs module)
     for bp in configuration['extensions']['blueprints']:
         app.register_blueprint(
             get_object_from_name(bp['name']),
             **bp.get('options', {})
         )
-    for jinja_extension in configuration['extensions']['jinja2']:
-        app.jinja_env.add_extension(jinja_extension['name'])
 
     return app
 

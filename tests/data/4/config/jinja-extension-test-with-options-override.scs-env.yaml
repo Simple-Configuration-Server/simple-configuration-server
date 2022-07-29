@@ -1,0 +1,3 @@
+template:
+  rendering_options:
+    keep_trailing_newline: false

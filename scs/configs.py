@@ -7,6 +7,7 @@ from pathlib import Path
 import copy
 import logging
 import os
+import inspect
 
 from flask import (
     Blueprint, request, g, make_response, abort, current_app, Response,
@@ -14,7 +15,7 @@ from flask import (
 )
 from flask.blueprints import BlueprintSetupState
 import fastjsonschema
-from jinja2 import TemplateError
+from jinja2 import TemplateError, Environment
 from yaml import YAMLError
 
 from . import yaml, errors
@@ -22,6 +23,12 @@ from .tools import get_object_from_name
 from .logging import register_audit_event
 
 bp = Blueprint('configs', __name__, url_prefix='/configs')
+native_rendering_options = set(
+    inspect.getfullargspec(Environment.__init__).args
+)
+native_rendering_options.difference_update([
+    'loader', 'extensions', 'undefined',
+])
 
 # These are registered with the logging module in the init function
 _AUDIT_EVENTS = [
@@ -52,6 +59,24 @@ _validate_env_file = fastjsonschema.compile(_env_file_schema)
 _DEFAULT_ENV = _validate_env_file({})
 
 
+def split_jinja_env_options(options: dict) -> tuple[dict, dict]:
+    """
+    Split the provided jinja environment options into (1) options that are
+    natively supported, and can therefore be provided at environment init,
+    and (2) other options that are not officially supported, and should be
+    added after init using the .extend method
+    """
+    native_options = {}
+    non_native_options = {}
+    for key, value in options.items():
+        if key in native_rendering_options:
+            native_options[key] = value
+        else:
+            non_native_options[key] = value
+
+    return (native_options, non_native_options)
+
+
 @bp.record
 def init(setup_state: BlueprintSetupState):
     """
@@ -67,7 +92,7 @@ def init(setup_state: BlueprintSetupState):
 
 
     """
-    global _config_basepath
+    global _config_basepath, default_rendering_options, jinja_extensions
 
     scs_config = setup_state.app.config['SCS']
 
@@ -100,8 +125,17 @@ def init(setup_state: BlueprintSetupState):
         validate_dots=validate_dots
     )
 
-    # Configure template rendering options
-    setup_state.app.jinja_options.update(default_rendering_options)
+    # Native env options should be passed at init, non-native ones should be
+    # applied using extend to ensure no built-in properties are overriden
+    native_env_options, extend_env_options = split_jinja_env_options(
+        default_rendering_options
+    )
+    setup_state.app.jinja_options.update(native_env_options)
+    setup_state.app.jinja_env.extend(**extend_env_options)
+
+    jinja_extensions = scs_config['extensions']['jinja2']
+    for jinja_extension in jinja_extensions:
+        setup_state.app.jinja_env.add_extension(jinja_extension['name'])
 
     bp.template_folder = _config_basepath
 
@@ -327,15 +361,6 @@ def _resource_exists(path: str) -> bool:
     return full_path.is_file()
 
 
-# These seem to erroneously not be supported on the overlay function
-# https://github.com/pallets/jinja/issues/1645
-# Test the removal of this after jinja2>=3.1.2 is released
-_MISSING_OVERLAY_OPTIONS = [
-    'newline_sequence',
-    'keep_trailing_newline'
-]
-
-
 @bp.route('/<path:path>', methods=('GET', 'POST'))
 def view_config_file(path: str) -> Response:
     """
@@ -374,18 +399,20 @@ def view_config_file(path: str) -> Response:
     secret_ids = yaml.serialize_secrets(env)
 
     if env['template']['enabled']:
-        if rendering_options := env['template']['rendering_options']:
-            # Since some options seem to erroneously not be supported, these
-            # are applied later
-            # https://github.com/pallets/jinja/issues/1645
-            # Test the removal of this after jinja2>=3.1.2 is released
-            unsupported_options = {}
-            for key in _MISSING_OVERLAY_OPTIONS:
-                if key in rendering_options:
-                    unsupported_options[key] = rendering_options.pop(key)
-            jinja_env = current_app.jinja_env.overlay(**rendering_options)
-            for key, value in unsupported_options.items():
-                setattr(jinja_env, key, value)
+        if additional_options := env['template']['rendering_options']:
+            # Since it should be supported to override properties that are
+            # initially set using .extend, create a completely new environment
+            # with the existing loader, because .extend cannot be used twice
+            combined_options = copy.copy(default_rendering_options)
+            combined_options.update(additional_options)
+            native_env_options, extend_env_options = split_jinja_env_options(
+                combined_options
+            )
+            native_env_options['loader'] = current_app.jinja_env.loader
+            jinja_env = Environment(**native_env_options)
+            jinja_env.extend(**extend_env_options)
+            for jinja_extension in jinja_extensions:
+                jinja_env.add_extension(jinja_extension['name'])
         else:
             jinja_env = current_app.jinja_env
 
