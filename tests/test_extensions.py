@@ -15,7 +15,7 @@ count_log_file = Path(log_path, 'counts.log')
 count_log_file.unlink(missing_ok=True)
 
 
-client = tools.get_test_client(config_dir)
+client = tools.get_test_client(config_dir, testing=True)
 tokens = tools.safe_load_yaml_file(
     Path(config_dir, 'secrets/scs-tokens.yaml')
 )
@@ -70,7 +70,7 @@ def test_jinja_extension_with_overrides():
         environ_base={'REMOTE_ADDR': '127.0.0.1'},
     )
     assert response.status_code == 200
-    assert response.text == 'this is a test for SCS'
+    assert response.text == 'this is a test for override'
 
 
 def test_blueprint_extension():

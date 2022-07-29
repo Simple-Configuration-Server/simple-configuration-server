@@ -26,14 +26,17 @@ def safe_load_yaml_file(path: Path) -> Any:
         return yaml.safe_load(yamlfile)
 
 
-def get_test_client(config_dir: Path) -> Client:
+def get_test_client(config_dir: Path, testing: bool = False) -> Client:
     """
     Get a test client, configured using the files from the given config
-    directory
+    directory. 'testing' is set as the app.testing attribute
     """
     os.environ['SCS_CONFIG_DIR'] = config_dir.as_posix()
 
     app = create_app()
+    if testing:
+        app.testing = True
+
     return app.test_client()
 
 

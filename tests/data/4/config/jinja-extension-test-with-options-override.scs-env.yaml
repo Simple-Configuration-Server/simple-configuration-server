@@ -1,3 +1,4 @@
 template:
   rendering_options:
     keep_trailing_newline: false
+    suffix_for_string: ' override'

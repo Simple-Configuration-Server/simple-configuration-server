@@ -3,6 +3,7 @@ Contains SCS extensions used in the unit-tests
 """
 from yaml import Loader, Node
 from jinja2.ext import Extension
+import functools
 
 from scs.yaml import SCSYamlTagConstructor
 
@@ -32,17 +33,20 @@ class CapatilizeExtendPhraseConstructor(SCSYamlTagConstructor):
             return value.upper() + self.suffix
 
 
-def add_scs_suffix(str_: str) -> str:
+def add_suffix(str_: str, *, suffix: str) -> str:
     """
-    Add ' SCS' to the end of a string
+    Add a suffix the end of a string
     """
-    return str_ + ' SCS'
+    return str_ + suffix
 
 
-class AddSCSExtension(Extension):
+class AddSuffixExtension(Extension):
     """
     Simple Extension that adds SCS to the end of a phrase
     """
     def __init__(self, environment):
         super().__init__(environment)
-        environment.filters['add_scs_suffix'] = add_scs_suffix
+        suffix = environment.suffix_for_string
+        environment.filters['add_suffix'] = functools.partial(
+          add_suffix, suffix=suffix
+        )

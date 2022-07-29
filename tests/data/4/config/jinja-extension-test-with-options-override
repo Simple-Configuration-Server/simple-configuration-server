@@ -1,1 +1,1 @@
-{{ "this is a test for" | add_scs_suffix }}
+{{ "this is a test for" | add_suffix }}

@@ -10,7 +10,8 @@ environments:
 templates:
   cache: false
   validate_on_startup: false
-  rendering_options: {}
+  rendering_options:
+    suffix_for_string: ' SCS'
 
 logs:
   audit:
@@ -51,4 +52,4 @@ extensions:
       options:
         log_path: !scs-expand-env ${SCS_CONFIG_DIR}/temp/counts.log
   jinja2:
-    - name: scs_extensions.AddSCSExtension
+    - name: scs_extensions.AddSuffixExtension
