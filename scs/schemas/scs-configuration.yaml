@@ -247,6 +247,7 @@ properties:
               description:
                 When applicable, the data in this object is passed as keyword
                 arguments when the class is initialized.
+        default: []
       blueprints:
         <<: *module-element-reference
         description:
@@ -254,6 +255,7 @@ properties:
           keyword arguments to the Flask.register_blueprint method, meaning
           they are accessible in the BluePrintSetupState of blueprint
           initialization (decorated with bp.record) functions.
+        default: []
       jinja2:
         <<: *module-element-reference
         description:
@@ -261,3 +263,4 @@ properties:
           cannot be passed to these at init. As described in the Jinja
           documentation, use the environment options (under
           template.rendering_options) to pass variables to these.
+        default: []
