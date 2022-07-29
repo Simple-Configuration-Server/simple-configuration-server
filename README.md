@@ -1017,11 +1017,14 @@ To log custom audit events:
 Note that, as with error ids, it's advised to include your package name into
 the 'event_type' to prevent overlap with other extensions.
 
-To log to the SCS application log, use the application logger:
+To log to the application log, use the builtin python logging module
+as usual:
 ```python
-from Flask import current_app
+import logging
 
-current_app.logger.info('Logged at info level')
+logger = logging.getLogger(__name__)
+
+logger.info('INFO message')
 ```
 
 #### 4.3.3 YAML Constructors
