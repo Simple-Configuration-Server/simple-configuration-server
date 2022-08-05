@@ -675,6 +675,9 @@ In addition to deploying SCS, you can also use logging agents to stream the
 logs to a central logging database. Section 3.3 includes an example
 where Elastic Filebeat is used to stream the logs to ElasticSearch.
 
+For security considerations related to the deployement of the SCS, please
+see section 3 of [SECURITY.md](SECURITY.md).
+
 ### 3.1 Docker
 The SCS Docker image is published in the GitLab Container Registry of this
 repository.
@@ -719,6 +722,7 @@ services:
       - SCS_REVERSE_PROXY_COUNT=0
     ports:
       - 3000:80
+    restart: on-failure:5
 ```
 Alternatively, you can use CI/CD inside your configuration data repository to
 build an image that includes your configuration (except the secrets) as
@@ -798,8 +802,10 @@ This section discusses how to work on the SCS core or Docker container
 configuration, as well as how extensions or a 3rd party auth blueprint for the
 SCS can be developed.
 
-_(Note: For the process and checklist of contributing changes to this
-repository, please see [CONTRIBUTING.md](CONTRIBUTING.md))_
+_Note: For the process and checklist of contributing changes to this
+repository, please see [CONTRIBUTING.md](CONTRIBUTING.md). If you find any
+security issues, please use the process described in [SECURITY.md](SECURITY.md)
+to report them_
 
 ### 4.1 SCS Core
 
