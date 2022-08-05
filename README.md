@@ -865,7 +865,13 @@ _DEFAULT_ENV inside [configs.py](scs/configs.py) is loaded directly from the
 dictionary. Changing any default settings should preferably be done by changing
 the JSON-schema only.
 
-#### 4.1.3 Testing
+#### 4.1.3 Debugging and Linting
+Note that this repository contains a [debugging configuration](.vscode/launch.json)
+for Visual Studio Code.
+
+Please use Flake8 for linting your code, to make sure it conforms to PEP8.
+
+#### 4.1.4 Testing
 If you make any changes to the code, please add to or update the tests
 accordingly.
 
