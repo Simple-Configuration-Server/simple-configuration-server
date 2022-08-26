@@ -1,5 +1,5 @@
 _Please note that all pull-requests must be backed by a submitted issue. Please
-see [CONTRIBUTING.md](../../CONTRIBUTING.md) for a description of the process_
+see CONTRIBUTING.md for a description of the process_
 
 In response to: [Provide a link to the issue here]
 
@@ -9,9 +9,9 @@ doubts, or alternative ways of implementation, please mention your
 considerations here]
 
 ## Checklist
-Before submitting, all points below must be checked (See [CONTRIBUTING.md](../../CONTRIBUTING.md)):
+Before submitting, all points below must be checked (See CONTRIBUTING.md):
 - [ ] New tests are added
-- [ ] All tests run succesfully
+- [ ] All tests run successfully
 - [ ] Documentation is updated
 - [ ] There are no linting errors
 - [ ] Your commits are squashed

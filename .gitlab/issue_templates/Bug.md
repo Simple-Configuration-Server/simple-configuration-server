@@ -1,4 +1,4 @@
-_Please see [CONTRIBUTING.md](../../CONTRIBUTING.md) first, in case you want to
+_Please see CONTRIBUTING.md first, in case you want to
 submit a pull-request for a fix_
 
 ## 1 Summary
