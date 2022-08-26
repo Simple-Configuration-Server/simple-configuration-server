@@ -17,6 +17,3 @@ Before submitting, all points below must be checked (See CONTRIBUTING.md):
 - [ ] Your commits are squashed
 - [ ] All commit messages follow the guidelines
 - [ ] Your branch is (re)based on the latest version of the master branch
-
-/label ~Unclassified
-/assign @tom-brouwer

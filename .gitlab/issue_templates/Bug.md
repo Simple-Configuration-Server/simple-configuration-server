@@ -1,3 +1,4 @@
+# Bug Report
 _Please see CONTRIBUTING.md first, in case you want to
 submit a pull-request for a fix_
 
@@ -26,6 +27,3 @@ submit a pull-request for a fix_
 ## 5 Fix
 [When you know it, (1) please indicate the cause of the bug and (2) indicate
 if you're willing to submit a Pull Request for a fix]
-
-/label ~Unclassified ~Bug
-/assign @tom-brouwer
