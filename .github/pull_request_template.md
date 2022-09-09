@@ -1,5 +1,6 @@
-_Please note that all merge-requests must be backed by a submitted issue.
-Please see CONTRIBUTING.md for a description of the process_
+_Please note that all pull-requests must be backed by an issue submitted to
+the GitLab repostory. Please see CONTRIBUTING.md for a description of the
+process_
 
 In response to: [Provide a link to the issue here]
 
