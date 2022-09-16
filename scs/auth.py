@@ -25,6 +25,7 @@ import logging
 
 from flask import Blueprint, request, abort, g
 from flask.blueprints import BlueprintSetupState
+import fastjsonschema
 
 from . import yaml, errors, tools
 from .logging import register_audit_event
@@ -66,6 +67,12 @@ _AUDIT_EVENTS = [
         "User '{user}' tried to access {path} but is not authorized",
     ),
 ]
+
+# Load the schema to validate the users file against
+current_dir = Path(__file__).absolute().parent
+_schema_path = Path(current_dir, 'schemas/scs-users.yaml')
+_users_schema = yaml.safe_load_file(_schema_path)
+validate_users_file = fastjsonschema.compile(_users_schema)
 
 
 class _SCSUsersFileLoader(yaml.SCSYamlLoader):
@@ -163,6 +170,7 @@ def init(setup_state: BlueprintSetupState):
     )
     scs_users = yaml.load_file(users_file_path, loader=_SCSUsersFileLoader)
     yaml.serialize_secrets(scs_users)
+    scs_users = validate_users_file(scs_users)
 
     # Parse whitelisted IP ranges:
     _global_whitelist = [

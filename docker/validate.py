@@ -28,7 +28,7 @@ import fastjsonschema
 from yaml import YAMLError
 
 import scs
-from scs import tools
+from scs import tools, auth, yaml
 
 current_dir = Path(__file__).parent.absolute()
 
@@ -126,6 +126,24 @@ def get_test_definition(
     return path_config
 
 
+def validate_user_configuration(path: Path):
+    """
+    Validates if the user configuration matches the scs-users schema.
+
+    Raises:
+        JsonSchemaValueException in case the users file fails validation
+    """
+    dummy_secret_constructor = yaml.SCSSimpleValueConstructor(
+        tag='!scs-secret',
+        value='DUMMY_REFERENCED_SECRET',
+    )
+    auth._SCSUsersFileLoader.add_constructor(
+        dummy_secret_constructor.tag, dummy_secret_constructor.construct
+    )
+    scs_users = yaml.load_file(path, loader=auth._SCSUsersFileLoader)
+    auth.validate_users_file(scs_users)
+
+
 if __name__ == '__main__':
     print('Validating SCS configuration...', flush=True)
     scs_config = scs.load_application_configuration()
@@ -135,6 +153,16 @@ if __name__ == '__main__':
     # Override configuration with validation specific properties
     for key, value in script_config['scs_configuration'].items():
         scs_config[key] = value
+
+    # Since the 'auth' module is not used during validation, the 'scs-users'
+    # file is not valided by SCS. Therefore, validate it here first.
+    auth_blueprint = scs_config['auth']['blueprint']
+    if auth_blueprint == 'scs.auth.bp':
+        user_config_path = Path(
+            scs_config['auth']['options']['users_file']
+        )
+        if user_config_path.is_file():
+            validate_user_configuration(user_config_path)
 
     # For validation, auth is disabled, and all !scs-secret references are
     # replaced by a fixed value, because secrets are not included in
