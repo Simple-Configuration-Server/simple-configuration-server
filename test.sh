@@ -16,7 +16,7 @@ if [[ $DOCKERFILE_CONTENTS != *"FROM python:$PYTHON_VERSION "* ]]; then
 fi
 
 if [[ $CICDFILE_CONTENTS != *"image: python:$PYTHON_VERSION"* ]]; then
-  echo "ERROR: GitLab workflow python version inconsistent with test.sh!"
+  echo "ERROR: GitHub workflow python version inconsistent with test.sh!"
   exit 1
 fi
 

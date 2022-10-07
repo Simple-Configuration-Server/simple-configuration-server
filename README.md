@@ -178,8 +178,8 @@ Because SCS allows you to fully seperate the secrets from the actual
 configuration files, configurations hosted using the SCS can be be completely
 stored in GIT repositories. An example of what such a repository would look
 like, including a more elaborate illustration of SCS features and a recipe for
-using GitLab CI/CD to build docker images that include your configuration can
-be found in the [example-scs-configuration](https://github.com/tom-brouwer/example-scs-configuration)
+using GitHub Workflows to build docker images that include your configuration
+can be found in the [example-scs-configuration](https://github.com/tom-brouwer/example-scs-configuration)
 repository.
 
 ## 2 Configuration
@@ -682,6 +682,10 @@ see section 3 of [SECURITY.md](SECURITY.md).
 The SCS Docker image is published in the GitLab Container Registry of this
 repository.
 
+_Note that future versions are set to be published in the GitHub Container
+Registry. After the first release on GitHub, the below link is updated
+accordingly_
+
 The simplest way to deploy the SCS with your configuration is to
 use the Docker-image as-is, and use bind-mounts to set your configuration and
 SSL keys on it, as illusted in the below example docker-compose.yml file:
@@ -690,7 +694,7 @@ version: "3.9"
 
 services:
   server:
-    image: registry.gitlab.com/tom-brouwer/simple-configuration-server:1.0.1
+    image: registry.gitlab.com/tom-brouwer/simple-configuration-server:1.0.2
     volumes:
       # If all configuration, except secrets, are in a repository:
       - ./configuration-repository/configuration:/etc/scs/configuration
@@ -918,7 +922,8 @@ The default command of the Docker image is to start the server, as
 configured in the [Dockerfile](Dockerfile). Users can change the command to
 `python validate.py` to use the same image to validate their configuration
 repository contents. The Docker image for this repository is built with CI/CD
-(See configuration [here](.gitlab-ci.yml)) when git tags are pushed to GitLab.
+(See configuration [here](.github/workflows/main.yml)) when git tags are pushed
+to GitHub.
 
 ### 4.3 Extensions
 The SCS is designed to be extended with additional functionality at runtime.
