@@ -67,6 +67,12 @@ Please note the following when deploying SCS:
 
 * **Secure Transfer**: When transferring data such as secrets to a machine or
   service, always use encrypted connections (e.g SSH/HTTPS)
+* **Keep Secrets Seperately**: It's recommended to seperate your secrets
+  by creating a seperate 'secrets' folder, and applying the '!scs-secret' tag
+  to reference them inside scs-env.yaml files. If you define secrets directly
+  inside scs-env.yaml files, but you misspell the name of the file so it
+  doesn't end   with 'scs-env.yaml', your secrets will be directly
+  available to end-users via an additional endpoint.
 * **Secure File-System**: Since 'secrets' are stored in yaml files by default,
   put measures in place to prevent unauthorized access of the file-system:
     * Never store secrets on machines that are used by others
@@ -79,8 +85,8 @@ Please note the following when deploying SCS:
 * **Use HTTPS**: Even on private networks, it's best to use HTTPS
   to prevent man-in-the-middle attacks. If you're not hosting the system under
   a domain, you can use self-signed certificates, and configure it's public key
-  as trusted on the clients. (E.g. generate as described [here](https://www.digitalocean.com/community/tutorials/how-to-create-a-self-signed-ssl-certificate-for-nginx-in-ubuntu-22-04) and use
-  the --cacert option in curl).
+  as trusted on the clients. (E.g. generate as described [here](https://www.digitalocean.com/community/tutorials/how-to-create-a-self-signed-ssl-certificate-for-nginx-in-ubuntu-22-04)
+  and use the --cacert option in curl).
 * **Use a Firewall**: Although IPs may not be whitelisted in SCS, SCS still has
   to process their requests before rejecting them. This means even non-globally
   whitelisted IPs can be used for a DOS attack. Therefore, especially for
