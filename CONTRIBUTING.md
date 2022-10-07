@@ -1,7 +1,7 @@
 # Contributing to SCS Development
 Anyone can contribute new features or fixes to the simple configuration
-server, or the Docker configuration of SCS. You can use the GitLab issue
-tracker to report bugs or request new features, and use merge-requests
+server, or the Docker configuration of SCS. You can use the GitHub issue
+tracker to report bugs or request new features, and use pull-requests
 to submit source-code changes.
 
 _Note that the process of developing the SCS, and the tools to use, are
@@ -34,9 +34,9 @@ Before starting to develop a bug-fix or new feature, make sure to create an
 issue first, as described in section 1. This ensures that (1) there is
 only one person or group of persons, developing a feature, rather than
 multiple people developing the same thing side-by-side, and (2) people are not
-submitting merge-requests for changes that will never be added to the
+submitting pull-requests for changes that will never be added to the
 source-code. Please wait for a response from a maintainer before submitting
-a merge-request. Merge-requests not linked to an issue will be ignored.
+a pull-request. Pull-requests not linked to an issue will be ignored.
 
 The general process of contributing a new feature is as follows:
 1. Create a fork of this repository under your own account, and create a new
@@ -65,8 +65,8 @@ The general process of contributing a new feature is as follows:
    repository.
 6. Switch to your feature branch and run `git rebase master`. Resolve any
    conflicts that arise.
-7. Create a merge-requests in this repository, and make sure no merge conflicts
-   are detected. Make sure to link the merge-request to the issue in the issue
+7. Create a pull-requests in this repository, and make sure no merge conflicts
+   are detected. Make sure to link the pull-request to the issue in the issue
    tracker.
 
 Note that if a maintainer reviews your work and requests changes, you'll

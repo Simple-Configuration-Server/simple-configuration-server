@@ -1,3 +1,9 @@
+---
+name: Feature Request
+about: Request a new feature to be added to the software
+labels: feature, new
+assignees: tom-brouwer
+---
 # Feature Request
 _Note: Please see CONTRIBUTING.md before you submit a feature request. Never
 submit requests for (1) Features that do not relate to the core of the SCS, and

@@ -37,9 +37,10 @@ When reporting a vulnerability, please submit the following:
   code on master branch), please include the git commit hash, and the output of
   the `pip freeze` command in your report
 
-Vulnerabilities can be reported as a new issue in the GitLab issue tracker,
-and **must be marked as confidential** by selecting the 'This issue is
-confidential' checkbox on submission.
+Vulnerabilities must be reported by [creating a new issue](https://gitlab.com/tom-brouwer/simple-configuration-server/-/issues/new)
+in the GitLab issue tracker, rather than on GitHub. GitLab is used for this,
+instead of GitHub, because it supports confidential issues. All vulnerabilities
+reported via GitLab **must be marked as confidential** before sumission.
 
 ## 2 Sharing Vulnerabilities
 Minor vulnerabilities that are unlikely to have an immediate impact on existing

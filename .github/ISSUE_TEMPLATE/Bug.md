@@ -1,3 +1,9 @@
+---
+name: Bug Report
+about: Report Bugs found in the software
+labels: bug, new
+assignees: tom-brouwer
+---
 # Bug Report
 _Please see CONTRIBUTING.md first, in case you want to
 submit a pull-request for a fix_

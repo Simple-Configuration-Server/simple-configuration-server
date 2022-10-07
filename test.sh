@@ -6,7 +6,7 @@ set -e
 PYTHON_VERSION=3.10
 
 DOCKERFILE_CONTENTS=$(cat Dockerfile)
-CICDFILE_CONTENTS=$(cat .gitlab-ci.yml)
+CICDFILE_CONTENTS=$(cat ./.github/workflows/main.yml)
 INSTALL_CONTENTS=$(cat install.sh)
 DEV_INSTALL_CONTENTS=$(cat install.dev.sh)
 
@@ -16,7 +16,7 @@ if [[ $DOCKERFILE_CONTENTS != *"FROM python:$PYTHON_VERSION "* ]]; then
 fi
 
 if [[ $CICDFILE_CONTENTS != *"image: python:$PYTHON_VERSION"* ]]; then
-  echo "ERROR: .gitlab-ci.yml python version inconsistent with test.sh!"
+  echo "ERROR: GitLab workflow python version inconsistent with test.sh!"
   exit 1
 fi
 
