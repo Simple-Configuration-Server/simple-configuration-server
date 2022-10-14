@@ -34,7 +34,7 @@ When reporting a vulnerability, please submit the following:
 * When the vulnerability affects a specific release, please reproduce the issue
   using an official SCS Docker image, and report the version number.
 * When the vulnerability affects a non-versioned release (e.g. the latest
-  code on master branch), please include the git commit hash, and the output of
+  code on main branch), please include the git commit hash, and the output of
   the `pip freeze` command in your report
 
 Vulnerabilities must be reported by [creating a new issue](https://gitlab.com/tom-brouwer/simple-configuration-server/-/issues/new)

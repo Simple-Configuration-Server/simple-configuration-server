@@ -40,9 +40,9 @@ a pull-request. Pull-requests not linked to an issue will be ignored.
 
 The general process of contributing a new feature is as follows:
 1. Create a fork of this repository under your own account, and create a new
-   branch based on master, e.g.:
+   branch based on main, e.g.:
    ```bash
-   git switch master
+   git switch main
    git switch -c "feature/xxxxxxxx"
    ```
    Add both your forked repository, as well as the official repository
@@ -61,9 +61,9 @@ The general process of contributing a new feature is as follows:
    Only use multiple commits if otherwise you'd be implementing multiple
    changes in one commit. Also note that the commit message should be formatted
    according to the guidelines [here](https://google.github.io/eng-practices/review/developer/cl-descriptions.html).
-5. Switch to master branch and pull the latest commits from the official
+5. Switch to main branch and pull the latest commits from the official
    repository.
-6. Switch to your feature branch and run `git rebase master`. Resolve any
+6. Switch to your feature branch and run `git rebase main`. Resolve any
    conflicts that arise.
 7. Create a pull-requests in this repository, and make sure no merge conflicts
    are detected. Make sure to link the pull-request to the issue in the issue

@@ -16,6 +16,6 @@ Before submitting, all points below must be checked (See CONTRIBUTING.md):
 - [ ] There are no linting errors
 - [ ] Your commits are squashed
 - [ ] All commit messages follow the guidelines
-- [ ] Your branch is (re)based on the latest version of the master branch
+- [ ] Your branch is (re)based on the latest version of the main branch
 - [ ] Your contribution complies with the terms set-out in section 3 of
       CONTRIBUTING.md
