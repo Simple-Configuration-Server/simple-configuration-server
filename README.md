@@ -179,7 +179,7 @@ configuration files, configurations hosted using the SCS can be be completely
 stored in GIT repositories. An example of what such a repository would look
 like, including a more elaborate illustration of SCS features and a recipe for
 using GitHub Workflows to build docker images that include your configuration
-can be found in the [example-scs-configuration](https://github.com/tom-brouwer/example-scs-configuration)
+can be found in the [example-scs-configuration](https://github.com/simple-configuration-server/example-configuration)
 repository.
 
 ## 2 Configuration
@@ -197,7 +197,7 @@ configuration files/variables using SCS, you will need:
    if validate.py is used to validate the configuration)
 
 Examples of these are illustrated in the basic example (section 1) and included
-in the [example-scs-configuration](https://github.com/tom-brouwer/example-scs-configuration)
+in the [example-scs-configuration](https://github.com/simple-configuration-server/example-configuration)
 repository.
 
 ### 2.1 Config Directory
@@ -730,7 +730,7 @@ services:
 ```
 Alternatively, you can use CI/CD inside your configuration data repository to
 build an image that includes your configuration (except the secrets) as
-illustrated in the [example-scs-configuration](https://github.com/tom-brouwer/example-scs-configuration)
+illustrated in the [example-scs-configuration](https://github.com/simple-configuration-server/example-configuration)
 repository.
 
 ### 3.2 Local Installation
