@@ -1,0 +1,32 @@
+directories:
+  common: !scs-expand-env ${SCS_CONFIG_DIR}/common
+  config: !scs-expand-env ${SCS_CONFIG_DIR}/config
+  secrets: &secrets-dir !scs-expand-env ${SCS_CONFIG_DIR}/secrets
+
+environments:
+  cache: false
+  reject_keys_containing_dots: true
+
+templates:
+  cache: false
+  validate_on_startup: false
+
+logs:
+  audit:
+    stdout:
+      level: CRITICAL
+  application:
+    stdout:
+      level: CRITICAL
+
+auth:
+  options:
+    users_file: !scs-expand-env ${SCS_CONFIG_DIR}/scs-users.yaml
+    directories:
+      secrets: *secrets-dir
+    networks:
+      private_only: true
+      whitelist:
+      - 127.0.0.1/32
+    max_auth_fails_per_15_min: 10
+
