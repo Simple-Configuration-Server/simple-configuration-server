@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Tests for the scs.auth module
+Tests for the scs.configs module
 
 
 Copyright 2022 Tom Brouwer
@@ -32,7 +32,7 @@ tokens = tools.safe_load_yaml_file(
 def test_request_file():
     """
     Test if a simple yml configuration file is properly parsed and if the
-    headers are properly set
+    expected response headers are sent
     """
     response = client.get(
         '/configs/elasticsearch/elasticsearch.yml',
@@ -55,7 +55,8 @@ def test_request_file():
 
 def test_wrong_method():
     """
-    Using a disallowed method should give a 405 status code
+    The server must generate a 405 reponse in case a method is used that's not
+    allowed for the endpoint
     """
     response = client.post(
         '/configs/elasticsearch/elasticsearch.yml',
@@ -71,7 +72,7 @@ def test_wrong_method():
 
 def test_redirect():
     """
-    Test if the redirect is properly working
+    Test if redirects using custom status codes are working
     """
     response = client.get(
         '/configs/elasticsearch/cluster_name_redirect',
@@ -110,14 +111,14 @@ def test_path_traversal():
         },
         environ_base={'REMOTE_ADDR': '192.168.1.34'},
     )
-    # First ensure the path is not simplified during the request
+    # Ensure the path is not simplified by the test client
     assert response.request.path == '/configs/../scs-users.yaml'
     assert response.status_code == 404
 
 
 def test_post_request():
     """
-    Check if post requests properly update the context
+    Check if variables in POST requests properly update the context
     """
     response = client.post(
         '/configs/elasticsearch/cluster_name',
@@ -129,14 +130,13 @@ def test_post_request():
         environ_base={'REMOTE_ADDR': '192.168.1.34'},
         json={'cluster_name': 'new-name'},
     )
-    # First ensure the path is not simplified during the request
     assert response.status_code == 200
     assert response.text == 'new-name'
 
 
 def test_post_schema_validation():
     """
-    Check if post requests properly update the context
+    Check if the POST request body is properly validated
     """
     response = client.post(
         '/configs/elasticsearch/cluster_name',
@@ -148,7 +148,6 @@ def test_post_schema_validation():
         environ_base={'REMOTE_ADDR': '192.168.1.34'},
         json={'cluster_way': 'wrongvalue'},
     )
-    # First ensure the path is not simplified during the request
     assert response.status_code == 400
     rdata = response.get_json()
     assert rdata['error']['id'] == 'request-body-invalid'
@@ -156,7 +155,7 @@ def test_post_schema_validation():
 
 def test_post_malformed():
     """
-    A 400 error should be returned, if malformed json is sent
+    A 400 error must be returned if malformed json is sent
     """
     response = client.post(
         '/configs/elasticsearch/cluster_name',
@@ -166,9 +165,8 @@ def test_post_malformed():
             ),
         },
         environ_base={'REMOTE_ADDR': '192.168.1.34'},
-        data='henkieisdebeste',
+        data='this-is-not-even-serialized-json',
     )
-    # First ensure the path is not simplified during the request
     assert response.status_code == 400
 
 
@@ -192,6 +190,6 @@ def test_without_templating():
         config_dir, 'config/elasticsearch/elasticsearch_template.yml'
     )
     with open(actual_path, 'r', encoding='utf8') as textfile:
-        file_text = textfile.read()
+        original_file_contents = textfile.read()
 
-    assert response.text == file_text
+    assert response.text == original_file_contents

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Tests for the scs.auth module
+Test if configuration files are properly validated during server initialization
 
 
 Copyright 2022 Tom Brouwer

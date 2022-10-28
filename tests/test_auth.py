@@ -30,7 +30,7 @@ tokens = tools.safe_load_yaml_file(
 
 def test_if_user_authenticates():
     """
-    Test if bearer token authentication works
+    Bearer authentication must be functional
     """
     response = client.get(
         '/configs/elasticsearch/elasticsearch.yml',
@@ -49,10 +49,9 @@ def test_wrong_credentials_and_limiting():
     Test (1) if users with bad credentials are denied access, and (2) if the
     rate-limiter kicks in after too many faulty authentication requests
 
-    Note: If this test is run exactly on the switch of one 15 minute window to
-    the next, it may fail
+    Note: If this test is run exactly on the breakpoint of two consecutive 15
+    minute windows, it may fail
     """
-    global _rate_limited_requests
     for i in range(11):
         response = client.get(
             '/configs/elasticsearch/elasticsearch.yml',
@@ -71,8 +70,8 @@ def test_wrong_credentials_and_limiting():
 
 def test_path_access_denied():
     """
-    Access to the root configs path should be denied for user 1, but allowed
-    for user 2
+    Test is access is granted or denied as expected based on the allowed paths
+    for each user
     """
     response = client.get(
         '/configs/host-name',
@@ -126,7 +125,7 @@ def test_path_access_denied():
 def test_global_whitelisted_but_not_user_whitelisted():
     """
     An IP address that is globally whitelisted, but not whitelisted for the
-    specific user should trigger a 403 error
+    specific user must trigger a 403 error
     """
     response = client.get(
         '/configs/elasticsearch/elasticsearch.yml',
@@ -143,7 +142,7 @@ def test_global_whitelisted_but_not_user_whitelisted():
 
 def test_not_globally_whitelisted():
     """
-    An IP address that is not globally whitelisted should also trigger a
+    An IP address that is not globally whitelisted must trigger a
     403 error
     """
     response = client.get(

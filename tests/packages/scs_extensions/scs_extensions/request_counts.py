@@ -1,6 +1,5 @@
 """
-Contains a test blueprint that logs the number of requests after each
-request to a file
+Contains a test blueprint that logs the total number of requests to a server
 
 
 Copyright 2022 Tom Brouwer

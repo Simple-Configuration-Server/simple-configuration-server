@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Tests for the scs.auth module
+Tests for the scs.errors module
 
 
 Copyright 2022 Tom Brouwer
@@ -30,8 +30,8 @@ tokens = tools.safe_load_yaml_file(
 
 def test_template_rendering_error():
     """
-    Test if a simple yml configuration file is properly parsed and if the
-    headers are properly set
+    Test if a descriptive error id is returned in case a template cannot be
+    rendered
     """
     response = client.get(
         '/configs/elasticsearch/heap_size',
@@ -48,8 +48,8 @@ def test_template_rendering_error():
 
 def test_env_file_format_error():
     """
-    Test if a simple yml configuration file is properly parsed and if the
-    headers are properly set
+    Test if a descriptive error id is returned in case the endpoint env file
+    fails schema validation
     """
     response = client.get(
         '/configs/elasticsearch/cluster_name_redirect',

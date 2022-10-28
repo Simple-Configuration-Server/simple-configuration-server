@@ -35,7 +35,8 @@ from scs import create_app  # noqa: E402
 
 def safe_load_yaml_file(path: Path) -> Any:
     """
-    Use the safe_load function to load a simple yaml file
+    Returns parsed YAML data from the file at the given path, loaded using
+    the yaml.safe_load function
     """
     with open(path, 'r', encoding='utf8') as yamlfile:
         return yaml.safe_load(yamlfile)
@@ -43,21 +44,28 @@ def safe_load_yaml_file(path: Path) -> Any:
 
 def get_test_client(config_dir: Path, testing: bool = False) -> Client:
     """
-    Get a test client, configured using the files from the given config
-    directory. 'testing' is set as the app.testing attribute
+    Returns a flask test client, configured using the files from the given
+    config directory.
+
+    Args:
+        config_dir:
+            The directory to search for configuration files
+        testing:
+            If True, exceptions are raised. If false, a 500 error response is
+            returned for exceptions
     """
     os.environ['SCS_CONFIG_DIR'] = config_dir.as_posix()
 
     app = create_app()
-    if testing:
-        app.testing = True
+    app.testing = testing
 
     return app.test_client()
 
 
 def load_jsonlines_file(path: Path) -> list:
     """
-    Load the lines of a JSON-lines file
+    Returns the parsed content of a JSON-lines file, each line being a list
+    item
     """
     lines = []
     with open(path, 'r', encoding='utf8') as jsonlinesfile:

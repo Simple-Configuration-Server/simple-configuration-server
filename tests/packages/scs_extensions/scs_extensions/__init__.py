@@ -1,5 +1,5 @@
 """
-Contains SCS extensions used in the unit-tests
+Contains the SCS extensions used to test the runtime extension functionality
 
 
 Copyright 2022 Tom Brouwer
@@ -57,7 +57,8 @@ def add_suffix(str_: str, *, suffix: str) -> str:
 
 class AddSuffixExtension(Extension):
     """
-    Simple Extension that adds SCS to the end of a phrase
+    Simple Jinja2 Extension that adds the content of the 'suffix_for_string'
+    environment property to a string
     """
     def __init__(self, environment):
         super().__init__(environment)

@@ -1,5 +1,5 @@
 """
-Tests for audit logging
+Tests for loading and using runtime extensions for SCS
 
 
 Copyright 2022 Tom Brouwer
@@ -90,7 +90,7 @@ def test_jinja_extension_with_overrides():
 
 def test_blueprint_extension():
     """
-    Test if the configured jinja extension is working
+    Test if the configured blueprint is working
     """
     # 2 requests were performed, so the last line should contain '2'. wait
     # shortly to ensure it's written
