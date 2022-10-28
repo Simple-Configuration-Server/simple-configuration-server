@@ -292,9 +292,9 @@ def serialize_secrets(data: dict | list) -> list[str]:
     Serialize all secrets in the data (In-place)
 
     Args:
-        env_data:
-            The environment data, possible containg SCSSecret objects. This
-            will be serialized IN PLACE
+        data:
+            Data structure possibly containing nested 'SCSSecret' objects,
+            which are then serialized IN PLACE.
 
     Returns:
         The id's of the secrets that were serialized
@@ -319,7 +319,6 @@ def serialize_secrets(data: dict | list) -> list[str]:
     return secret_ids
 
 
-# The default constructors used by SCS
 class SCSSecretConstructor(RelativePathMixin, SCSYamlTagConstructor):
     """
     The default constructor for the 'scs-secret' tag

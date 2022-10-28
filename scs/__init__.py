@@ -26,14 +26,14 @@ import fastjsonschema
 from . import configs, errors, logging, yaml
 from .tools import get_object_from_name
 
-current_dir = Path(__file__).absolute().parent
+module_dir = Path(__file__).absolute().parent
 
 # Load the schema to validate the configuration file against
-_schema_path = Path(current_dir, 'schemas/scs-configuration.yaml')
+_schema_path = Path(module_dir, 'schemas/scs-configuration.yaml')
 _configuration_schema = yaml.safe_load_file(_schema_path)
 
 
-def create_app(configuration: dict = None) -> Flask:
+def create_app(configuration: dict | None = None) -> Flask:
     """
     Factory to create the Flask app for the Simple Configuration Server
 
@@ -52,9 +52,9 @@ def create_app(configuration: dict = None) -> Flask:
     if configuration is None:
         configuration = load_application_configuration()
 
-    # The auth configuration is passed to the blueprint directly
-    # and not available under the app,config attribute
-    auth_config = configuration.pop('auth')
+    # The auth config does not need to be available system wide, just pass it
+    # to the auth module
+    auth_configuration = configuration.pop('auth')
 
     app.config['SCS'] = configuration
 
@@ -69,30 +69,29 @@ def create_app(configuration: dict = None) -> Flask:
     app.register_blueprint(errors.bp)
     app.register_blueprint(configs.bp)
 
-    # Dynamically Register auth blueprint, and pass the auth config options
     try:
-        auth_blueprint = get_object_from_name(auth_config['blueprint'])
+        auth_blueprint = get_object_from_name(auth_configuration['blueprint'])
     except ValueError:
         raise ValueError(
-            f"Cannot find auth.blueprint: {auth_config['blueprint']}"
+            f"Cannot find auth.blueprint: {auth_configuration['blueprint']}"
         )
     app.register_blueprint(
         auth_blueprint,
-        **auth_config['options'],
+        **auth_configuration['options'],
     )
 
-    # Load blueprints (Other extensions loaded inside configs module)
-    for bp in configuration['extensions']['blueprints']:
+    for blueprint_definition in configuration['extensions']['blueprints']:
+        blueprint_name = blueprint_definition['name']
         try:
-            bp_object = get_object_from_name(bp['name'])
+            blueprint = get_object_from_name(blueprint_name)
         except ValueError:
             raise ValueError(
-                f"Cannot find extensions.blueprint: {bp['name']}"
+                f"Cannot find extensions.blueprint: {blueprint_name}"
             )
 
         app.register_blueprint(
-            bp_object,
-            **bp.get('options', {})
+            blueprint,
+            **blueprint_definition.get('options', {})
         )
 
     return app
@@ -100,33 +99,33 @@ def create_app(configuration: dict = None) -> Flask:
 
 def load_application_configuration() -> dict:
     """
-    Loads the main SCS configuration file
+    Returns the parsed and validated contents of the scs-configuration.yaml
+    file
 
     Returns:
         The configuration file data
     """
-    # Get the configuration file path
     config_dir = Path(os.environ['SCS_CONFIG_DIR']).absolute()
     if not config_dir.is_dir():
         raise ValueError('The provided SCS_CONFIG_DIR does not exist!')
 
-    scs_conf_path = Path(config_dir, 'scs-configuration.yaml')
+    config_file_path = Path(config_dir, 'scs-configuration.yaml')
 
-    # Enable Environment variable expansion for yaml loader and load the config
-    # file
     expand_env_constructor = yaml.SCSExpandEnvConstructor()
     yaml.SCSAppConfigLoader.add_constructor(
         expand_env_constructor.tag, expand_env_constructor.construct
     )
 
-    configuration_data = yaml.load_file(scs_conf_path, yaml.SCSAppConfigLoader)
+    configuration_data = yaml.load_file(
+        config_file_path, yaml.SCSAppConfigLoader,
+    )
 
     return validate_configuration(configuration_data)
 
 
 def validate_configuration(configuration_data: dict) -> dict:
     """
-    Validates the given configuration data using the schema, and sets
-    any defaults that are defined in the schema
+    Returns the configuration data, validated according to the JSON-schema,
+    with defaults filled for missing properties
     """
     return fastjsonschema.validate(_configuration_schema, configuration_data)

@@ -1,7 +1,6 @@
 # -*- coding; utf-8 -*-
 """
-Flask Blueprint containing the code for the configs/ endpoints, that loads the
-configuration data and returns the formatted data
+Flask Blueprint containing the code for the configs/ endpoints
 
 
 Copyright 2022 Tom Brouwer
@@ -45,7 +44,6 @@ native_rendering_options.difference_update([
     'loader', 'extensions', 'undefined',
 ])
 
-# These are registered with the logging module in the init function
 _AUDIT_EVENTS = [
     (
         'config-loaded', logging.INFO,
@@ -65,13 +63,14 @@ _ERRORS = [
 ]
 
 # Load the schema, and use this to populate the default values of the ENV
-_env_file_schema_path = Path(
-    Path(__file__).absolute().parent,
-    'schemas/scs-env.yaml'
+_env_file_schema = yaml.safe_load_file(
+    Path(
+        Path(__file__).absolute().parent,
+        'schemas/scs-env.yaml'
+    )
 )
-_env_file_schema = yaml.safe_load_file(_env_file_schema_path)
 _validate_env_file = fastjsonschema.compile(_env_file_schema)
-_DEFAULT_ENV = _validate_env_file({})
+ENVIRONMENT_DEFAULTS = _validate_env_file({})
 
 
 def split_jinja_env_options(options: dict) -> tuple[dict, dict]:
@@ -94,25 +93,18 @@ def split_jinja_env_options(options: dict) -> tuple[dict, dict]:
 
 @bp.record
 def init(setup_state: BlueprintSetupState):
-    """
-    Initializes the configs/* endpoints
+    """Initializes the blueprint"""
+    global _config_basepath, default_rendering_options, \
+        jinja_extension_definitions
 
-    Args:
-        setup_state:
-            The .options attribute of this (options passed to
-            register_blueprint function) should contain the following dict
-            data:
-                directories: dict; containing:
-                    common, config, secrets: str
+    scs_configuration = setup_state.app.config['SCS']
 
-
-    """
-    global _config_basepath, default_rendering_options, jinja_extensions
-
-    scs_config = setup_state.app.config['SCS']
-
-    _config_basepath = Path(scs_config['directories']['config']).absolute()
-    common_basepath = Path(scs_config['directories']['common']).absolute()
+    _config_basepath = Path(
+        scs_configuration['directories']['config']
+    ).absolute()
+    common_basepath = Path(
+        scs_configuration['directories']['common']
+    ).absolute()
     if not _config_basepath.is_dir():
         raise ValueError(
             'The provided directories.config path does not exist!'
@@ -121,21 +113,23 @@ def init(setup_state: BlueprintSetupState):
         raise ValueError(
             'The provided directories.common path does not exist!'
         )
-    if 'secrets' in scs_config['directories']:
-        secrets_basepath = Path(
-            scs_config['directories']['secrets']
+    if 'secrets' in scs_configuration['directories']:
+        secrets_dir = Path(
+            scs_configuration['directories']['secrets']
         ).absolute()
     else:
-        secrets_basepath = None
-    add_constructors = scs_config['extensions']['constructors']
-    check_templates = scs_config['templates']['validate_on_startup']
-    default_rendering_options = scs_config['templates']['rendering_options']
-    validate_dots = scs_config['environments']['reject_keys_containing_dots']
-    enable_env_cache = scs_config['environments']['cache']
+        secrets_dir = None
+    add_constructors = scs_configuration['extensions']['constructors']
+    check_templates = scs_configuration['templates']['validate_on_startup']
+    default_rendering_options = \
+        scs_configuration['templates']['rendering_options']
+    validate_dots = \
+        scs_configuration['environments']['reject_keys_containing_dots']
+    enable_env_cache = scs_configuration['environments']['cache']
 
     _configure_yaml_loaders(
         common_dir=common_basepath,
-        secrets_dir=secrets_basepath,
+        secrets_dir=secrets_dir,
         add_constructors=add_constructors,
         validate_dots=validate_dots
     )
@@ -148,30 +142,23 @@ def init(setup_state: BlueprintSetupState):
     setup_state.app.jinja_options.update(native_env_options)
     setup_state.app.jinja_env.extend(**extend_env_options)
 
-    jinja_extensions = scs_config['extensions']['jinja2']
-    for jinja_extension in jinja_extensions:
-        setup_state.app.jinja_env.add_extension(jinja_extension['name'])
+    jinja_extension_definitions = scs_configuration['extensions']['jinja2']
+    for jinja_extension_def in jinja_extension_definitions:
+        setup_state.app.jinja_env.add_extension(jinja_extension_def['name'])
 
     bp.template_folder = _config_basepath
 
-    # Register all exceptions and audit events with the errors and logging
-    # modules, to make sure pre-defined json messages are returned when errors
-    # occur, and specific audit events can be logged from within this
-    # bluetprint
     for exc_class, error_id, error_msg in _EXCEPTIONS:
-        errors.register_exception(
-            exc_class, error_id,
-            message=error_msg
-        )
+        errors.register_exception(exc_class, error_id, message=error_msg)
     for audit_event_args in _AUDIT_EVENTS:
         register_audit_event(*audit_event_args)
     for error_args in _ERRORS:
         errors.register(*error_args)
 
     if enable_env_cache or check_templates:
-        relative_config_template_paths = get_relative_config_template_paths()
+        relative_config_template_paths = get_relative_endpoint_paths()
         for relative_url in relative_config_template_paths:
-            env = _load_env(relative_url.lstrip('/'))
+            env = _load_environment(relative_url.lstrip('/'))
             # If request.schema is defined, check if it's able to parse
             if env['request']['schema']:
                 fastjsonschema.compile(env['request']['schema'])
@@ -199,10 +186,12 @@ def _configure_yaml_loaders(
             The base directory used to resolve !scs-secret tags
 
         add_constructors:
-            List of custom constructers to add on top of the default ones
+            List of custom constructer definitions from scs-configuration.yaml
+            to add on top of the default ones
 
         validate_dots:
-            Whether errors should be generated if dots are in keys
+            If True, an exception is raised if the keys in YAML files contain
+            dots
     """
     env_file_constructors = [
         yaml.SCSRelativeConstructor(
@@ -220,15 +209,15 @@ def _configure_yaml_loaders(
     ]
 
     if add_constructors:
-        for constructor_config in add_constructors:
-            constructor_name = constructor_config['name']
+        for constructor_definition in add_constructors:
+            constructor_name = constructor_definition['name']
             try:
                 constructor_class = get_object_from_name(constructor_name)
             except ValueError:
                 raise ValueError(
                     f"Cannot find extensions.constructors: {constructor_name}"
                 )
-            options = constructor_config.get('options', {})
+            options = constructor_definition.get('options', {})
             constructor_instance = constructor_class(**options)
             if not isinstance(constructor_instance, yaml.SCSYamlTagConstructor):  # noqa:E501
                 raise ValueError(
@@ -268,6 +257,10 @@ def _load_env_file(relative_path: str) -> dict:
     Raises:
         EnvFileFormatException in case the env file does not pass JSON-schema
         validation
+
+    Returns:
+        The parsed env file data (Note that defauls are not filled, since files
+        are combined in the _load_environment function)
     """
     path = Path(_config_basepath, relative_path)
     if not path.is_file():
@@ -276,7 +269,7 @@ def _load_env_file(relative_path: str) -> dict:
     env_data = yaml.load_file(path, loader=yaml.SCSEnvFileLoader)
 
     try:
-        # Ignore the return, since we don't want to fill defaults
+        # Ignore the return, defaults should not be added
         _validate_env_file(env_data)
     except fastjsonschema.JsonSchemaValueException as e:
         raise EnvFileFormatException(
@@ -311,39 +304,40 @@ def _get_env_file_hierarchy(relative_path: str) -> list[str]:
     return ordered_envfiles
 
 
-def _load_env(relative_path: str):
+def _load_environment(relative_path: str):
     """
-    Load the combined env data for the template with the given relative_path
+    Load the combined environment data for the endpoint with the given
+    relative_path
 
     Args:
         relative_path:
-            The path of the template, relative to the config directory
+            The path of the template/endpoint, relative to the config directory
     Returns:
         The combined environment data of all environment files applicable to
         the template
     """
-    combined_env = copy.deepcopy(_DEFAULT_ENV)
-    rel_env_file_paths = _get_env_file_hierarchy(relative_path)
+    combined_env = copy.deepcopy(ENVIRONMENT_DEFAULTS)
+    relative_env_file_paths = _get_env_file_hierarchy(relative_path)
 
-    for rel_path in rel_env_file_paths:
-        data = _load_env_file(rel_path)
-        for pkey, pvalue in data.items():
-            for ckey, cvalue in pvalue.items():
-                if isinstance(cvalue, dict):
-                    combined_env[pkey][ckey].update(cvalue)
+    for relative_path in relative_env_file_paths:
+        data = _load_env_file(relative_path)
+        for root_level_key, root_level_value in data.items():
+            for child_key, child_value in root_level_value.items():
+                if isinstance(child_value, dict):
+                    combined_env[root_level_key][child_key].update(child_value)
                 else:
-                    combined_env[pkey][ckey] = cvalue
+                    combined_env[root_level_key][child_key] = child_value
 
     return combined_env
 
 
-def get_relative_config_template_paths() -> list[str]:
+def get_relative_endpoint_paths() -> list[str]:
     """
-    Gets the relative paths of all config templates
+    Gets the relative paths of all endpoints
 
     Returns:
-        List of all relative paths of available templates under the config
-        directory
+        List of all relative paths of available endpoints/templates under the
+        config directory
     """
     config_template_paths = []
     for path in _config_basepath.rglob('*'):
@@ -355,24 +349,22 @@ def get_relative_config_template_paths() -> list[str]:
     return config_template_paths
 
 
-def _resource_exists(path: str) -> bool:
+def _endpoint_exists(path: str) -> bool:
     """
-    Checks if a template exists that matches the given path
+    Checks if an endpoint exists that matches the given path
 
     Args:
         path: The path of the template
 
     Returns:
-        True if the path is valid and the template exists. Otherwise returns
+        True if the path is valid and the endpoint exists; else returns
         False
     """
-    # Prevent path traversal
-    # Note that this is later more extensively checked by the jinja loader
+    # Prevent path traversal (more thorough check later by the jinja loader)
     references_parent = any([p == os.path.pardir for p in path.split('/')])
     if references_parent:
         return False
 
-    # Prevent exposing env files
     if path.endswith('scs-env.yaml'):
         return False
 
@@ -393,21 +385,17 @@ def view_config_file(path: str) -> Response:
 
     Returns:
         Flask response object containing the rendered template
-
-    Raises:
-        werkzeug.exceptions.HTTPException in case (1) an invalid path is
-        provided (404) or an unsupported method is used (405)
     """
-    if not _resource_exists(path):
+    if not _endpoint_exists(path):
         abort(404)
 
-    env = _load_env(path)
+    env = _load_environment(path)
 
     if request.method not in env['request']['methods']:
         abort(405)
 
     if request.method == 'POST':
-        body = request.get_json(force=True)
+        body = request.get_json(force=True)  # 400 response for invalid json
         if env['request']['schema']:
             try:
                 body = fastjsonschema.validate(env['request']['schema'], body)
@@ -423,6 +411,7 @@ def view_config_file(path: str) -> Response:
             # Since it should be supported to override properties that are
             # initially set using .extend, create a completely new environment
             # with the existing loader, because .extend cannot be used twice
+            # on the same attributes
             combined_options = copy.copy(default_rendering_options)
             combined_options.update(additional_options)
             native_env_options, extend_env_options = split_jinja_env_options(
@@ -431,8 +420,8 @@ def view_config_file(path: str) -> Response:
             native_env_options['loader'] = current_app.jinja_env.loader
             jinja_env = Environment(**native_env_options)
             jinja_env.extend(**extend_env_options)
-            for jinja_extension in jinja_extensions:
-                jinja_env.add_extension(jinja_extension['name'])
+            for jinja_extension_def in jinja_extension_definitions:
+                jinja_env.add_extension(jinja_extension_def['name'])
         else:
             jinja_env = current_app.jinja_env
 
@@ -440,7 +429,7 @@ def view_config_file(path: str) -> Response:
         rendered_template = template.render(env['template']['context'])
 
         response = make_response(rendered_template)
-        response.headers.clear()  # Remove the default 'html' content type
+        response.headers.clear()  # Removes the default 'html' content type
     else:
         response = send_from_directory(_config_basepath, path)
 
@@ -456,8 +445,6 @@ def view_config_file(path: str) -> Response:
     return response
 
 
-# These are registered with the 'errors' module, to ensure correct error
-# messages are returned if these occur
 _EXCEPTIONS = [
     (
         YAMLError, 'env-syntax-error',

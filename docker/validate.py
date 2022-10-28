@@ -141,7 +141,7 @@ def validate_user_configuration(path: Path):
         dummy_secret_constructor.tag, dummy_secret_constructor.construct
     )
     scs_users = yaml.load_file(path, loader=auth._SCSUsersFileLoader)
-    auth.validate_users_file(scs_users)
+    auth.validate_user_configuration(scs_users)
 
 
 if __name__ == '__main__':
@@ -202,7 +202,7 @@ if __name__ == '__main__':
     # configured overrides
     all_test_paths = [
         f'/configs/{p.lstrip("/")}'.lower()
-        for p in scs.configs.get_relative_config_template_paths()
+        for p in scs.configs.get_relative_endpoint_paths()
     ]
 
     configured_endpoints = script_config['endpoints']

@@ -1,12 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Module that configures the logging of SCS. It configures seperate logs for
-'audit' events and for the Flask application logs.
-
-To log audit events from 3rd party blueprints, first register the audit events
-used by the blueprint on init, using the 'register_audit_event' function. For
-each request, blueprints can access the g.add_audit_event function to add an
-audit event. All events are logged when the request is completed.
+Module that controls SCS logging. Seperate logs are used for the application
+itself and for 'audit' logs.
 
 
 Copyright 2022 Tom Brouwer
@@ -49,9 +44,9 @@ def register_audit_event(
         type_: str, level: str | int, message_template: str
         ):
     """
-    Registers an audit event so it can be logged. After registration, you can
-    use the g.add_audit_event function, to add an audit event with the given
-    id
+    Registers an audit event so it can be logged. After registration, use the
+    g.add_audit_event function, to log an audit event with the given id for a
+    request
 
     Args:
         type_:
@@ -61,7 +56,7 @@ def register_audit_event(
             level)
         message_template:
             A template string that can use any of the variables in the event
-            details. These at least contain the 'ip' of the requester, and the
+            details. These at least contain the 'ip' of the user, and the
             'path' that is requested. See _add_audit_event function for
             available variables.
 
@@ -126,19 +121,14 @@ def _configure_logger(
             logging.getLevelName(level)
         )
 
-    # Set the lowest level on the logger itself
+    # make sure log records with relevant levels reach the handler
     logger_level = min(numeric_levels)
     logger.setLevel(logger_level)
 
 
 @bp.record
 def init(setup_state: BlueprintSetupState):
-    """
-    Initialize the logging module
-
-    Args:
-        setup_state: The Flask BluePrint Setup State
-    """
+    """Initialize the logging module"""
     source_name = setup_state.app.config['SCS']['logs']['source_name']
 
     audit_log_config = setup_state.app.config['SCS']['logs']['audit']
@@ -218,7 +208,8 @@ def init_events_function():
 @bp.after_app_request
 def log_audit_event(response: Response) -> Response:
     """
-    Create a log entries in case audit events were added during the request
+    Creates an audit log record for each audit event added to the request
+    context
 
     Args:
         response: The flask response (passed-through)
@@ -279,9 +270,9 @@ class AppLogFormatter(logging.Formatter):
         self.source_name = source_name
         super().__init__(*args, **kwargs)
 
-    def get_error_info(self, record: logging.LogRecord) -> str:
+    def get_error_info(self, record: logging.LogRecord) -> str | None:
         """
-        Gets an error information string, if an error has occured, otherwise
+        Returns an error information string, if an error has occured, otherwise
         returns None. Code partially from python builtin logging.Formatter
         """
         s = ' '
@@ -306,7 +297,7 @@ class AppLogFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         """
-        Returns the relevant data from the LogRecored, formatted as JSON (str)
+        Returns the log record contents, serialized as JSON
         """
         err = record.exc_info
         if err is False or err is True:

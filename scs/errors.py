@@ -30,16 +30,11 @@ bp = Blueprint('errors', __name__)
 
 _non_word_chars_regex = re.compile(r'\W+')
 
-# Error definitions are stored in the below variable. More can be added using
-# the .register function. Note that, if an 'id' is not supplied to the abort
-# function, the first key is used by default. If the code is not in this
-# variable, the json_error_response function will generate a JSON response from
-# the default exception name and description of flask
 _definitions = {
     400: {
         'bad-request': (
-            'Your request is invalid. For POST requests, check the JSON'
-            ' payload format'
+            'Your request is invalid. For POST requests, check if the request'
+            'body contains valid JSON'
         )
     },
     401: {
@@ -52,7 +47,7 @@ _definitions = {
     },
     405: {
         'method-not-allowed': (
-            'This HTTP request method cannot be used on the endpoint'
+            'The HTTP request method cannot be used on this endpoint'
         ),
     },
     500: {
@@ -62,8 +57,7 @@ _definitions = {
     }
 }
 
-# To return custom 500 error id's for specific exceptions, these can be added
-# using the 'register_exception' function.
+# Filled by the register_exception() function
 _exception_ids = []
 
 
@@ -74,12 +68,15 @@ def register(code: int, id_: str, message: str):
     `abort(429, description={'id': 'rate-limited'})`
 
     Args:
-        code: The HTTP response code to register the error for
-        id_: A unique identifier, returned in the JSON response
-        message: The message that should be returned in the JSON response
+        code:
+            The HTTP response code to register the error for
+        id_:
+            A unique identifier, returned in the JSON response
+        message:
+            The message that should be returned in the JSON response
 
     Raises:
-        ValueError: In case the given id_ is already registered to the code
+        ValueError: In case the given id_ is already registered for the code
     """
     code_errors = _definitions.setdefault(code, {})
     if id_ in code_errors:
@@ -95,25 +92,24 @@ def register_exception(
         ):
     """
     Registers a specific error id to be returned, if the given exception is
-    raised somewhere in the code. If the given id is not yet registered for the
-    500 status code, also a message should be provided.
+    raised when handling a request. If the given id is not yet registered for
+    the 500 status code, also a message should be provided.
 
     Note that if you don't want the server to return a 500 status code when
     the exception occurs, you should handle it in your own code, and call the
-    'abort()' function, as described in the 'register_error' docstring.
+    'abort()' function, as described in the register() function docstring.
 
     Args:
         exception_class:
             The class of the exception for which, if it occurs, the error with
             the given id should be returned
         id_:
-            An error id, already registered for code 500 using the
-            register_error function. Alternatively, if the 'message' parameter
-            is provided, it will be registered as an error for the 500 status
-            code
+            An error id, that is either (1) already registered for code 500
+            using the register() function, or (2) a new error id. In case of
+            the latter, also provide a message
         message:
-            When provided, the combination of the given id is also registered
-            as an error for the 500 status code ()
+            Provide a message in case the given id is not yet registered for
+            the 500 response code
 
     Raises:
         ValueError:
@@ -129,13 +125,18 @@ def register_exception(
 
     if message is not None:
         register(500, id_, message)
+    elif id_ not in _definitions[500]:
+        raise ValueError(
+            f'Error id {id_} not registered as an error, so a message must'
+            ' be provided'
+        )
 
     _exception_ids.append((exception_class, id_))
 
 
 def _error_response(code: int, id_: str, message: str) -> tuple[Response, int]:
     """
-    Returns an SCS error response
+    Returns an SCS error response and the corresponding code
 
     Args:
         code: Status code to return
@@ -182,16 +183,11 @@ def json_error_response(e) -> tuple[Response, int]:
         id_ = _get_500_error_id(e)
         message = _definitions[e.code][id_]
     elif e.code in _definitions:
-        # By default, use the first error id that is configured. If the
-        # description object contains an 'id' key, that id will be used if
-        # available
         id_ = next(iter(_definitions[e.code].keys()))
         if isinstance(e.description, dict):
             id_ = e.description.get('id', id_)
         message = _definitions[e.code][id_]
     else:
-        # In case no definition is given, the original error name is converted
-        # to an id, and the description is used as the message
         id_ = _non_word_chars_regex.sub('-', e.name.lower())
         message = e.description
 

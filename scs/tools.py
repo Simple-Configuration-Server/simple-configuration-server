@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Module containing functions and classes that are used by multiple modules of
-SCS
+Module containing tools used by multiple SCS modules
 
 
 Copyright 2022 Tom Brouwer
@@ -69,12 +68,12 @@ def get_referenced_fields(format_string: str) -> set[str]:
     return fields
 
 
-# Match wildcard characters that are not escaped
+# Matches wildcard characters that are not escaped
 _wildcard_pattern = re.compile(r'(?<!\\)\\\*')
 
 
 def contains_wildcard(path: str) -> bool:
-    """Check if the path contains a wildcard"""
+    """Returns 'true' if the given path if the path contains a wildcard"""
     return bool(_wildcard_pattern.search(re.escape(path)))
 
 
@@ -86,10 +85,10 @@ def build_pattern_from_path(wildcard_path: str) -> re.Pattern:
     Args:
         wildcard_path:
             For example '/configs/*.json'. To excape wildcard characters,
-            prefix them by a backslash (\\).
+            prefix them with a backslash (\\).
 
     Returns:
-        The compiled regex to match paths against
+        The compiled regex to match paths
     """
     regex_escaped = re.escape(wildcard_path)
     wildcard_converted = _wildcard_pattern.sub('(.*)', regex_escaped)
