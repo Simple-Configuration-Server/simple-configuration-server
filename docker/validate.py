@@ -144,7 +144,7 @@ def validate_user_configuration(path: Path):
     auth.validate_user_configuration(scs_users)
 
 
-if __name__ == '__main__':
+def main():
     print('Validating SCS configuration...', flush=True)
     scs_config = scs.load_application_configuration()
     script_config = load_script_configuration()
@@ -222,7 +222,6 @@ if __name__ == '__main__':
             f'paths: {invalid_paths}'
         )
 
-    test_results = {}
     for path in all_test_paths:
         definition = get_test_definition(
             path, default_test_definition, configured_endpoints
@@ -295,3 +294,7 @@ if __name__ == '__main__':
                     f'{base_message} Wrong YAML response {data}'
 
     print('SCS configuration validation succesful!', flush=True)
+
+
+if __name__ == '__main__':
+    main()

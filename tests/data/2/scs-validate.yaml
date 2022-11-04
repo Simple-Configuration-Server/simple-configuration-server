@@ -1,0 +1,6 @@
+endpoints:
+  /configs/production/architecture:
+    response:
+      text: x87
+
+allow_secrets: True
