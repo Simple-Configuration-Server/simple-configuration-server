@@ -361,19 +361,6 @@ class SCSCommonConstructor(RelativePathMixin, SCSYamlTagConstructor):
         return self._get_data(base_dir, ref)
 
 
-class SCSRelativeConstructor(RelativePathMixin, SCSYamlTagConstructor):
-    """
-    The default constructor for the 'scs-relative' tag
-    """
-    tag = '!scs-relative'
-    loader = SCSEnvFileLoader
-
-    def construct(self, loader: Loader, node: Node) -> Any:
-        ref = node.value
-        base_dir = loader.filepath.parent
-        return self._get_data(base_dir, ref)
-
-
 class SCSExpandEnvConstructor(SCSYamlTagConstructor):
     """
     The default constructor for the 'scs-expand-env' tag

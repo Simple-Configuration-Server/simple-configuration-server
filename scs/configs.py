@@ -194,9 +194,6 @@ def _configure_yaml_loaders(
             dots
     """
     env_file_constructors = [
-        yaml.SCSRelativeConstructor(
-            validate_dots=validate_dots,
-        ),
         yaml.SCSSecretConstructor(
             secrets_dir=secrets_dir,
             validate_dots=validate_dots,

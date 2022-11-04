@@ -5,7 +5,6 @@ template:
     http_port: !scs-common 'common-vars.yaml#elasticsearch.port'
     node_name: "main ES host"
     password: !scs-secret 'es_secrets.yaml#password'
-    heap: !scs-relative 'heap_size.scs-env.yaml#template.context.heap'
   rendering_options:
     keep_trailing_newline: false
 

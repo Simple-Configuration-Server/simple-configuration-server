@@ -1,7 +1,3 @@
-template:
-  context:
-    heap: 1gb
-
 response:
   headers:
     Content-Type: 'text/plain'
