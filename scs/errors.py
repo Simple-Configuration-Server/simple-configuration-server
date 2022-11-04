@@ -1,4 +1,3 @@
-# -*- coding; utf-8 -*-
 """
 Flask Blueprint that contains the custom error handlers for SCS, making sure
 that machine interpretable JSON responses are returned in case of errors.

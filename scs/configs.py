@@ -1,4 +1,3 @@
-# -*- coding; utf-8 -*-
 """
 Flask Blueprint containing the code for the configs/ endpoints
 

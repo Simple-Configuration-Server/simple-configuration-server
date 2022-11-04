@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Test if configuration files are properly validated during server initialization
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Module that controls SCS logging. Seperate logs are used for the application
 itself and for 'audit' logs.

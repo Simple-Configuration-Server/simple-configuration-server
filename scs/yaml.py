@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Contains the built-in YAML Loaders, loading functions, and constructors. A
 file cache is implemented to cache loaded content when required.

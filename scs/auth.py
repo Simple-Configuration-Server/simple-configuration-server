@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Flask Blueprint containing all behaviour related to the authentication and
 authorization of users/clients
