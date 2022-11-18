@@ -70,7 +70,6 @@ After creating a fork and cloning the repository locally:
     ```bash
     export SCS_CONFIG_DIR=$(pwd)/tests/data/1
     mkdir -p /var/log/scs
-    export SCS_LOG_DIR=/var/log/scs
     export FLASK_APP=scs
     export FLASK_ENV=development
     flask run
