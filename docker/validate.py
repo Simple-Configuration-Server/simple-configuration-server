@@ -133,14 +133,20 @@ def validate_user_configuration(path: Path):
     Raises:
         JsonSchemaValueException in case the users file fails validation
     """
+    class DummyUsersFileLoader(yaml.SCSYamlLoader):
+        """
+        Class to load the users file with dummy secrets
+        """
+        pass
+
     dummy_secret_constructor = yaml.SCSSimpleValueConstructor(
         tag='!scs-secret',
         value='DUMMY_REFERENCED_SECRET',
     )
-    auth._SCSUsersFileLoader.add_constructor(
+    DummyUsersFileLoader.add_constructor(
         dummy_secret_constructor.tag, dummy_secret_constructor.construct
     )
-    scs_users = yaml.load_file(path, loader=auth._SCSUsersFileLoader)
+    scs_users = yaml.load_file(path, loader=DummyUsersFileLoader)
     auth.validate_user_configuration(scs_users)
 
 

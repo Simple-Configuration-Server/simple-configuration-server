@@ -56,7 +56,10 @@ def create_app(configuration: dict | None = None) -> Flask:
         The main flask application
     """
     app = Flask(__name__)
-    app.scs = SCSObject()  # emtpy class to store SCS related objects
+
+    # The app.scs attribute stores re-usable objects and functions during
+    # the initialzation of the various modules
+    app.scs = SCSObject()
 
     if configuration is None:
         configuration = load_application_configuration()
@@ -117,13 +120,17 @@ def load_application_configuration() -> dict:
 
     config_file_path = Path(config_dir, 'scs-configuration.yaml')
 
+    class SCSAppConfigLoader(yaml.SCSYamlLoader):
+        """Local class, so it's not re-used when initializing multiple apps"""
+        pass
+
     expand_env_constructor = yaml.SCSExpandEnvConstructor()
-    yaml.SCSAppConfigLoader.add_constructor(
+    SCSAppConfigLoader.add_constructor(
         expand_env_constructor.tag, expand_env_constructor.construct
     )
 
     configuration_data = yaml.load_file(
-        config_file_path, yaml.SCSAppConfigLoader,
+        config_file_path, SCSAppConfigLoader,
     )
 
     return validate_configuration(configuration_data)

@@ -63,20 +63,10 @@ class SCSYamlLoader(SafeLoader):
         super().__init__(*args, **kwargs)
 
 
-# Seperate classes are defined for each type of loader. Different constructors
-# are added to them during server initialization
-class SCSAppConfigLoader(SCSYamlLoader):
-    """Used to load the App configuration files"""
-    pass
-
-
+# Loaders used in multiple locations in the code. Constructors are added to
+# these at the end of this file
 class SCSSecretFileLoader(SCSYamlLoader):
-    """Used to load secret files"""
-    pass
-
-
-class SCSEnvFileLoader(SCSYamlLoader):
-    """Used to load the scs-env.yaml files"""
+    """Used by SCSSecretConstructor to load secrets files"""
     pass
 
 
@@ -129,15 +119,13 @@ class RelativePathMixin:
     # Regex to match a list index inside a scs-ref tag contents
     index_regex = re.compile(r'\[(\d+)\]')
 
-    @property
-    @abstractmethod
-    def loader(self) -> type:
-        """The Loader Class (NOT: instance) to use"""
-        pass
-
     def __init__(self, *args, validate_dots: bool = True, **kwargs):
         self.validate_dots = validate_dots
         super().__init__(*args, **kwargs)
+        if not hasattr(self, 'loader') or not isinstance(self.loader, type):
+            raise TypeError(
+                'The self.loader property must available after init!'
+            )
 
     def _get_data(self, base_dir: Path, ref: str) -> Any:
         """
@@ -294,12 +282,13 @@ class SCSCommonConstructor(RelativePathMixin, SCSYamlTagConstructor):
 
     Attributes:
         common_dir: The directory containing the yaml files with common data
+        loader: The SCSYAMLLoader class to use for loading the files
     """
     tag = '!scs-common'
-    loader = SCSEnvFileLoader
 
-    def __init__(self, *args, common_dir: Path, **kwargs):
+    def __init__(self, *args, common_dir: Path, loader: type, **kwargs):
         self.common_dir = common_dir
+        self.loader = loader
         super().__init__(*args, **kwargs)
 
     def construct(self, loader: Loader, node: Node) -> Any:
@@ -372,3 +361,10 @@ class SCSSimpleValueConstructor(SCSYamlTagConstructor):
 
     def construct(self, loader: Loader, node: Node) -> Any:
         return self.value
+
+
+# Initialize constructors for loaders that are not changed
+_scs_gen_secret_constructor = SCSGenSecretConstructor()
+SCSSecretFileLoader.add_constructor(
+    _scs_gen_secret_constructor.tag, _scs_gen_secret_constructor.construct
+)

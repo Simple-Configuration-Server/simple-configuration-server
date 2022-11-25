@@ -157,12 +157,24 @@ def init(setup_state: BlueprintSetupState):
     else:
         setup_state.app.scs.env_cache = None
 
-    _configure_yaml_loaders(
+    class SCSEnvFileLoader(yaml.SCSYamlLoader):
+        """
+        Loader used for *.scs-env.yaml files
+
+        Function local class, since these are changed per app by adding
+        constructors
+        """
+        pass
+
+    _configure_env_loader(
+        loader=SCSEnvFileLoader,
         common_dir=common_basepath,
         secrets_dir=secrets_dir,
         add_constructors=add_constructors,
         validate_dots=validate_dots
     )
+
+    setup_state.app.scs.EnvFileLoader = SCSEnvFileLoader
 
     # Native env options should be passed at init, non-native ones should be
     # applied using extend to ensure no built-in properties are overriden
@@ -201,15 +213,18 @@ def init(setup_state: BlueprintSetupState):
                 template.render(**env['template']['context'])
 
 
-def _configure_yaml_loaders(
-        *, common_dir: Path, secrets_dir: Path, add_constructors: list[dict],
-        validate_dots: bool,
+def _configure_env_loader(
+        *, loader: type, common_dir: Path, secrets_dir: Path,
+        add_constructors: list[dict], validate_dots: bool,
         ):
     """
     Configure the YAML loaders used by the configs module, to use the right
     constructors for YAML tags
 
     Args:
+        loader:
+            The SCSYAMLLoader to configure
+
         common_dir:
             The base directory used to resolve !scs-common tags
 
@@ -232,6 +247,7 @@ def _configure_yaml_loaders(
         yaml.SCSCommonConstructor(
             common_dir=common_dir,
             validate_dots=validate_dots,
+            loader=loader,
         ),
         yaml.SCSExpandEnvConstructor(),
     ]
@@ -256,17 +272,8 @@ def _configure_yaml_loaders(
                 constructor_instance
             )
 
-    SECRET_FILE_CONSTRUCTORS = [
-        yaml.SCSGenSecretConstructor(),
-    ]
-
     for constructor in env_file_constructors:
-        yaml.SCSEnvFileLoader.add_constructor(
-            constructor.tag, constructor.construct
-        )
-
-    for constructor in SECRET_FILE_CONSTRUCTORS:
-        yaml.SCSSecretFileLoader.add_constructor(
+        loader.add_constructor(
             constructor.tag, constructor.construct
         )
 
@@ -297,10 +304,13 @@ def _load_env_file(relative_path: str) -> dict:
     if current_app.scs.env_cache is not None:
         env_data = current_app.scs.env_cache.get(path)
         if env_data is None:
-            env_data = yaml.load_file(path, loader=yaml.SCSEnvFileLoader)
+            env_data = yaml.load_file(
+                path,
+                loader=current_app.scs.EnvFileLoader
+            )
             current_app.scs.env_cache.add(path, env_data)
     else:
-        env_data = yaml.load_file(path, loader=yaml.SCSEnvFileLoader)
+        env_data = yaml.load_file(path, loader=current_app.scs.EnvFileLoader)
 
     try:
         # Ignore the return, defaults should not be added

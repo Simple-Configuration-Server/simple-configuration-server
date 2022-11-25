@@ -73,11 +73,6 @@ _users_schema = yaml.safe_load_file(
 validate_user_configuration = fastjsonschema.compile(_users_schema)
 
 
-class _SCSUsersFileLoader(yaml.SCSYamlLoader):
-    """Loader for the user configuration file"""
-    pass
-
-
 class _RateLimiter:
     """
     Tracks invalid authentication attempts for the current 15 minute interval
@@ -156,10 +151,19 @@ def init(setup_state: BlueprintSetupState):
         secrets_dir=secrets_dir,
         validate_dots=validate_dots
     )
-    _SCSUsersFileLoader.add_constructor(
+
+    class SCSUsersFileLoader(yaml.SCSYamlLoader):
+        """
+        Loader for the user configuration file
+
+        Local class used to prevent re-use accross multiple apps
+        """
+        pass
+
+    SCSUsersFileLoader.add_constructor(
         secrets_constructor.tag, secrets_constructor.construct
     )
-    scs_users = yaml.load_file(users_file_path, loader=_SCSUsersFileLoader)
+    scs_users = yaml.load_file(users_file_path, loader=SCSUsersFileLoader)
     yaml.serialize_secrets(scs_users)
     scs_users = validate_user_configuration(scs_users)
 
