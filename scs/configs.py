@@ -118,18 +118,16 @@ def split_jinja_env_options(options: dict) -> tuple[dict, dict]:
 @bp.record
 def init(setup_state: BlueprintSetupState):
     """Initializes the blueprint"""
-    global _config_basepath, default_rendering_options, \
-        jinja_extension_definitions
-
     scs_configuration = setup_state.app.config['SCS']
 
-    _config_basepath = Path(
+    config_basepath = Path(
         scs_configuration['directories']['config']
     ).absolute()
+    setup_state.app.scs.config_basepath = config_basepath
     common_basepath = Path(
         scs_configuration['directories']['common']
     ).absolute()
-    if not _config_basepath.is_dir():
+    if not config_basepath.is_dir():
         raise ValueError(
             'The provided directories.config path does not exist!'
         )
@@ -147,6 +145,7 @@ def init(setup_state: BlueprintSetupState):
     check_templates = scs_configuration['templates']['validate_on_startup']
     default_rendering_options = \
         scs_configuration['templates']['rendering_options']
+    setup_state.app.scs.default_rendering_options = default_rendering_options
     validate_dots = \
         scs_configuration['environments']['reject_keys_containing_dots']
     enable_env_cache = scs_configuration['environments']['cache']
@@ -186,8 +185,10 @@ def init(setup_state: BlueprintSetupState):
     jinja_extension_definitions = scs_configuration['extensions']['jinja2']
     for jinja_extension_def in jinja_extension_definitions:
         setup_state.app.jinja_env.add_extension(jinja_extension_def['name'])
+    setup_state.app.scs.jinja_extension_definitions = \
+        jinja_extension_definitions
 
-    bp.template_folder = _config_basepath
+    bp.template_folder = config_basepath
 
     for exc_class, error_id, error_msg in _EXCEPTIONS:
         setup_state.app.scs.register_exception(
@@ -199,7 +200,9 @@ def init(setup_state: BlueprintSetupState):
         setup_state.app.scs.register_error(*error_args)
 
     if enable_env_cache or check_templates:
-        relative_config_template_paths = get_relative_endpoint_paths()
+        relative_config_template_paths = get_relative_endpoint_paths(
+            config_basepath
+        )
         for relative_url in relative_config_template_paths:
             with setup_state.app.app_context():
                 env = _load_environment(relative_url.lstrip('/'))
@@ -298,7 +301,7 @@ def _load_env_file(relative_path: str) -> dict:
         The parsed env file data (Note that defauls are not filled, since files
         are combined in the _load_environment function)
     """
-    path = Path(_config_basepath, relative_path)
+    path = Path(current_app.scs.config_basepath, relative_path)
     if not path.is_file():
         return {}
 
@@ -376,7 +379,7 @@ def _load_environment(relative_path: str):
     return combined_env
 
 
-def get_relative_endpoint_paths() -> list[str]:
+def get_relative_endpoint_paths(config_basepath: Path) -> list[str]:
     """
     Gets the relative paths of all endpoints
 
@@ -385,10 +388,10 @@ def get_relative_endpoint_paths() -> list[str]:
         config directory
     """
     config_template_paths = []
-    for path in _config_basepath.rglob('*'):
+    for path in config_basepath.rglob('*'):
         if path.is_file() and not path.name.endswith('scs-env.yaml'):
             relative_template_path = \
-                path.as_posix().removeprefix(_config_basepath.as_posix())
+                path.as_posix().removeprefix(config_basepath.as_posix())
             config_template_paths.append(relative_template_path)
 
     return config_template_paths
@@ -413,7 +416,7 @@ def _endpoint_exists(path: str) -> bool:
     if path.endswith('scs-env.yaml'):
         return False
 
-    full_path = Path(_config_basepath, path)
+    full_path = Path(current_app.scs.config_basepath, path)
 
     return full_path.is_file()
 
@@ -457,7 +460,9 @@ def view_config_file(path: str) -> Response:
             # initially set using .extend, create a completely new environment
             # with the existing loader, because .extend cannot be used twice
             # on the same attributes
-            combined_options = copy.copy(default_rendering_options)
+            combined_options = copy.copy(
+                current_app.scs.default_rendering_options
+            )
             combined_options.update(additional_options)
             native_env_options, extend_env_options = split_jinja_env_options(
                 combined_options
@@ -465,7 +470,8 @@ def view_config_file(path: str) -> Response:
             native_env_options['loader'] = current_app.jinja_env.loader
             jinja_env = Environment(**native_env_options)
             jinja_env.extend(**extend_env_options)
-            for jinja_extension_def in jinja_extension_definitions:
+            extension_definitions = current_app.scs.jinja_extension_definitions
+            for jinja_extension_def in extension_definitions:
                 jinja_env.add_extension(jinja_extension_def['name'])
         else:
             jinja_env = current_app.jinja_env
@@ -476,7 +482,7 @@ def view_config_file(path: str) -> Response:
         response = make_response(rendered_template)
         response.headers.clear()  # Removes the default 'html' content type
     else:
-        response = send_from_directory(_config_basepath, path)
+        response = send_from_directory(current_app.scs.config_basepath, path)
 
     response.headers.update(env['response']['headers'])
     response.status = env['response']['status']

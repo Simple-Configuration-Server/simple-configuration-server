@@ -208,7 +208,9 @@ def main():
     # configured overrides
     all_test_paths = [
         f'/configs/{p.lstrip("/")}'.lower()
-        for p in scs.configs.get_relative_endpoint_paths()
+        for p in scs.configs.get_relative_endpoint_paths(
+            app.scs.config_basepath
+        )
     ]
 
     configured_endpoints = script_config['endpoints']
