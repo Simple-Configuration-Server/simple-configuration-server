@@ -27,7 +27,6 @@ from flask.blueprints import BlueprintSetupState
 import fastjsonschema
 
 from . import yaml, errors, tools
-from .logging import register_audit_event
 
 
 bp = Blueprint('auth', __name__)
@@ -205,7 +204,7 @@ def init(setup_state: BlueprintSetupState):
     for error_args in _ERRORS:
         errors.register(*error_args)
     for audit_event_args in _AUDIT_EVENTS:
-        register_audit_event(*audit_event_args)
+        setup_state.app.scs.register_audit_event(*audit_event_args)
 
 
 def _is_whitelisted(

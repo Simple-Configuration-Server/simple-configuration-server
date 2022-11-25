@@ -23,8 +23,9 @@ import json
 import datetime
 from pathlib import Path
 import copy
+import functools
 
-from flask import Blueprint, g, request, Response
+from flask import Blueprint, g, request, Response, current_app, Flask
 from flask.blueprints import BlueprintSetupState
 from flask.logging import default_handler
 
@@ -32,15 +33,9 @@ from .tools import get_referenced_fields
 
 bp = Blueprint('audit', __name__)
 
-_audit_logger = logging.getLogger('audit')
-_audit_logger.propagate = False  # This will be a seperate log file
 
-# This is filled by the register_audit_event() function
-_audit_events = {}
-
-
-def register_audit_event(
-        type_: str, level: str | int, message_template: str
+def _register_audit_event(
+        type_: str, level: str | int, message_template: str, *, app: Flask,
         ):
     """
     Registers an audit event so it can be logged. After registration, use the
@@ -58,16 +53,18 @@ def register_audit_event(
             details. These at least contain the 'ip' of the user, and the
             'path' that is requested. See _add_audit_event function for
             available variables.
+        app:
+            The flask app to register the audit event on
 
     Raises:
         ValueError in case the given type_ is already registered
     """
-    if type_ in _audit_events:
+    if type_ in app.scs._audit_events:
         raise ValueError(
             f'CONFLICT: Audit event type {type_} is already registered'
         )
 
-    _audit_events[type_] = {
+    app.scs._audit_events[type_] = {
         'level': level,
         'message_template': message_template,
         'required_fields': get_referenced_fields(message_template),
@@ -125,17 +122,33 @@ def _configure_logger(
     logger.setLevel(logger_level)
 
 
+def _get_audit_logger():
+    """
+    Makes sure a unique audit logger is returned, in case multiple apps are
+    initialized
+    """
+    i = 0
+    while True:
+        name = f'audit_{i}'
+        if name not in logging.Logger.manager.loggerDict:
+            return logging.getLogger(name)
+        i += 1
+
+
 @bp.record
 def init(setup_state: BlueprintSetupState):
     """Initialize the logging module"""
     source_name = setup_state.app.config['SCS']['logs']['source_name']
 
+    audit_logger = _get_audit_logger()
+    audit_logger.propagate = False  # This will be a seperate log file
     audit_log_config = setup_state.app.config['SCS']['logs']['audit']
     _configure_logger(
-        _audit_logger,
+        audit_logger,
         audit_log_config,
         AuditLogFormatter(source_name=source_name),
     )
+    setup_state.app.scs._audit_logger = audit_logger
 
     app_log_config = setup_state.app.config['SCS']['logs']['application']
     app_logger = setup_state.app.logger
@@ -144,6 +157,12 @@ def init(setup_state: BlueprintSetupState):
         app_logger,
         app_log_config,
         AppLogFormatter(source_name=source_name),
+    )
+
+    setup_state.app.scs._audit_events = {}
+    setup_state.app.scs.register_audit_event = functools.partial(
+        _register_audit_event,
+        app=setup_state.app,
     )
 
 
@@ -168,7 +187,8 @@ def _add_audit_event(event_type: str, **kwargs):
         }
     }
 
-    required_fields = _audit_events[event_type]['required_fields']
+    required_fields = \
+        current_app.scs._audit_events[event_type]['required_fields']
 
     if hasattr(g, 'user_id'):
         event['details']['user'] = g.user_id
@@ -217,12 +237,14 @@ def log_audit_event(response: Response) -> Response:
         The Flask response, passed through from the input parameter
     """
     for event in g.audit_events:
-        event_properties = _audit_events[event['type']]
+        event_properties = current_app.scs._audit_events[event['type']]
         level = event_properties['level']
         message = event_properties['message_template'].format(
             **event['details']
         )
-        _audit_logger.log(level, message, extra={'audit_event': event})
+        current_app.scs._audit_logger.log(
+            level, message, extra={'audit_event': event},
+        )
 
     return response
 

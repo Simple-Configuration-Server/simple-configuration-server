@@ -34,7 +34,6 @@ from yaml import YAMLError
 
 from . import yaml, errors
 from .tools import get_object_from_name
-from .logging import register_audit_event
 
 bp = Blueprint('configs', __name__, url_prefix='/configs')
 native_rendering_options = set(
@@ -193,7 +192,7 @@ def init(setup_state: BlueprintSetupState):
     for exc_class, error_id, error_msg in _EXCEPTIONS:
         errors.register_exception(exc_class, error_id, message=error_msg)
     for audit_event_args in _AUDIT_EVENTS:
-        register_audit_event(*audit_event_args)
+        setup_state.app.scs.register_audit_event(*audit_event_args)
     for error_args in _ERRORS:
         errors.register(*error_args)
 
