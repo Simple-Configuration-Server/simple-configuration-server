@@ -32,6 +32,15 @@ _schema_path = Path(module_dir, 'schemas/scs-configuration.yaml')
 _configuration_schema = yaml.safe_load_file(_schema_path)
 
 
+class SCSObject:
+    """
+    Empty class for setting arbitrary attributes
+
+    Used as app.scs in the code, to store global objects at the app level
+    """
+    pass
+
+
 def create_app(configuration: dict | None = None) -> Flask:
     """
     Factory to create the Flask app for the Simple Configuration Server
@@ -47,6 +56,7 @@ def create_app(configuration: dict | None = None) -> Flask:
         The main flask application
     """
     app = Flask(__name__)
+    app.scs = SCSObject()  # emtpy class to store SCS related objects
 
     if configuration is None:
         configuration = load_application_configuration()
@@ -56,9 +66,6 @@ def create_app(configuration: dict | None = None) -> Flask:
     auth_configuration = configuration.pop('auth')
 
     app.config['SCS'] = configuration
-
-    if not configuration['environments']['cache']:
-        yaml.filecache.disable()
 
     if not configuration['templates']['cache']:
         app.config['TEMPLATES_AUTO_RELOAD'] = True

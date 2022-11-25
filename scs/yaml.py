@@ -1,6 +1,5 @@
 """
-Contains the built-in YAML Loaders, loading functions, and constructors. A
-file cache is implemented to cache loaded content when required.
+Contains the built-in YAML Loaders, loading functions, and constructors.
 
 
 Copyright 2022 Tom Brouwer
@@ -23,54 +22,9 @@ import re
 import os
 from pathlib import Path
 import secrets
-import copy
 from random import randint
 
 from yaml import Loader, Node, SafeLoader, dump, safe_load
-
-
-class _ParsedFileCache:
-    """
-    Object to store parsed contents of YAML files. If enabled, this means
-    YAML files only have to be loaded and parsed once. Use the disable() method
-    to disable the caching of YAML files
-    """
-    def __init__(self):
-        self._cache = {}
-        self.disabled = False
-
-    def clear(self):
-        """Clears the parsed file cache"""
-        self._cache = {}
-
-    def get_file(self, path: os.PathLike) -> Any:
-        """
-        Get the contents of the file with the given path from the cache
-        """
-        if not self.disabled:
-            abspath = Path(path).absolute().as_posix()
-            data = self._cache.get(abspath)
-            if data is not None:
-                return copy.deepcopy(data)
-
-    def add_file(self, path: os.PathLike, data):
-        """
-        Adds the parsed data (contents) of the file at the given file path to
-        the cache
-        """
-        if not self.disabled:
-            abspath = Path(path).absolute().as_posix()
-            self._cache[abspath] = copy.deepcopy(data)
-
-    def disable(self):
-        """
-        Disables the cache
-        """
-        self.clear()
-        self.disabled = True
-
-
-filecache = _ParsedFileCache()
 
 
 class SCSYamlTagConstructor(ABC):
@@ -138,10 +92,6 @@ def load_file(path: Path, loader: type) -> Any:
     Returns:
         The data loaded from the YAML file
     """
-    path = path.absolute()
-    if (data := filecache.get_file(path)) is not None:
-        return data
-
     with open(path, 'r', encoding='utf8') as yamlfile:
         yaml_loader = loader(yamlfile, filepath=path)
         data = yaml_loader.get_single_data()
@@ -150,14 +100,12 @@ def load_file(path: Path, loader: type) -> Any:
         with open(path, 'w', encoding='utf8') as yamlfile:
             dump(data, yamlfile, sort_keys=False)
 
-    filecache.add_file(path, data)
-
     return data
 
 
 def safe_load_file(path: Path) -> Any:
     """
-    Use the default pyyaml SafeLoader to load a file (uncached)
+    Use the default pyyaml SafeLoader to load a file
 
     Args:
         path: The full path of the YAML file

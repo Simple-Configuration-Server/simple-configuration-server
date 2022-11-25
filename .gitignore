@@ -5,3 +5,4 @@ temp/
 build/
 *.egg-info/
 .local/
+tests/data/1/config/elasticsearch/cache_test.scs-env.yaml

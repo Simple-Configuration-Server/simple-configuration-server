@@ -21,6 +21,7 @@ import copy
 import logging
 import os
 import inspect
+from typing import Any
 
 from flask import (
     Blueprint, request, g, make_response, abort, current_app, Response,
@@ -70,6 +71,31 @@ _env_file_schema = yaml.safe_load_file(
 )
 _validate_env_file = fastjsonschema.compile(_env_file_schema)
 ENVIRONMENT_DEFAULTS = _validate_env_file({})
+
+
+class EnvironmentFileCache:
+    """
+    Object to store parsed contents of *scs-env.yaml files
+    """
+    def __init__(self):
+        self._cache = {}
+
+    def get(self, path: os.PathLike) -> Any:
+        """
+        Get the contents of the file with the given path from the cache
+        """
+        abspath = Path(path).absolute().as_posix()
+        data = self._cache.get(abspath)
+        if data is not None:
+            return copy.deepcopy(data)
+
+    def add(self, path: os.PathLike, data: Any):
+        """
+        Adds the parsed data (contents) of the file at the given file path to
+        the cache
+        """
+        abspath = Path(path).absolute().as_posix()
+        self._cache[abspath] = copy.deepcopy(data)
 
 
 def split_jinja_env_options(options: dict) -> tuple[dict, dict]:
@@ -126,6 +152,11 @@ def init(setup_state: BlueprintSetupState):
         scs_configuration['environments']['reject_keys_containing_dots']
     enable_env_cache = scs_configuration['environments']['cache']
 
+    if enable_env_cache:
+        setup_state.app.scs.env_cache = EnvironmentFileCache()
+    else:
+        setup_state.app.scs.env_cache = None
+
     _configure_yaml_loaders(
         common_dir=common_basepath,
         secrets_dir=secrets_dir,
@@ -157,7 +188,8 @@ def init(setup_state: BlueprintSetupState):
     if enable_env_cache or check_templates:
         relative_config_template_paths = get_relative_endpoint_paths()
         for relative_url in relative_config_template_paths:
-            env = _load_environment(relative_url.lstrip('/'))
+            with setup_state.app.app_context():
+                env = _load_environment(relative_url.lstrip('/'))
             # If request.schema is defined, check if it's able to parse
             if env['request']['schema']:
                 fastjsonschema.compile(env['request']['schema'])
@@ -262,7 +294,13 @@ def _load_env_file(relative_path: str) -> dict:
     if not path.is_file():
         return {}
 
-    env_data = yaml.load_file(path, loader=yaml.SCSEnvFileLoader)
+    if current_app.scs.env_cache is not None:
+        env_data = current_app.scs.env_cache.get(path)
+        if env_data is None:
+            env_data = yaml.load_file(path, loader=yaml.SCSEnvFileLoader)
+            current_app.scs.env_cache.add(path, env_data)
+    else:
+        env_data = yaml.load_file(path, loader=yaml.SCSEnvFileLoader)
 
     try:
         # Ignore the return, defaults should not be added

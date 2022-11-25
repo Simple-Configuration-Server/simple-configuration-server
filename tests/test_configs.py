@@ -192,3 +192,60 @@ def test_without_templating():
         original_file_contents = textfile.read()
 
     assert response.text == original_file_contents
+
+
+def test_cache():
+    """
+    Test if caching works as expected. Cache is enabled, so:
+    (1) On first request the scs-env is not there, response is empty
+    (2) On second request, the scs-env is there, response contains data
+    (3) On third request, the scs-env is changed, but still the data from the
+        second request is returned
+    """
+    response = client.get(
+        '/configs/elasticsearch/cache_test',
+        headers={
+            'Authorization': (
+                f"Bearer {tokens['test-user']}"
+            ),
+        },
+        environ_base={'REMOTE_ADDR': '192.168.1.34'},
+    )
+    assert response.text == ''
+
+    env_path = Path(
+        config_dir, 'config/elasticsearch/cache_test.scs-env.yaml'
+    )
+    with open(env_path, 'w', encoding='utf8') as yamlfile:
+        yaml.dump({'template': {'context': {'cache_var': 'cached'}}}, yamlfile)
+
+    try:
+        response = client.get(
+            '/configs/elasticsearch/cache_test',
+            headers={
+                'Authorization': (
+                    f"Bearer {tokens['test-user']}"
+                ),
+            },
+            environ_base={'REMOTE_ADDR': '192.168.1.34'},
+        )
+        assert response.text == 'cached'
+
+        with open(env_path, 'w', encoding='utf8') as yamlfile:
+            yaml.dump(
+                {'template': {'context': {'cache_var': 'updated'}}},
+                yamlfile,
+            )
+
+        response = client.get(
+            '/configs/elasticsearch/cache_test',
+            headers={
+                'Authorization': (
+                    f"Bearer {tokens['test-user']}"
+                ),
+            },
+            environ_base={'REMOTE_ADDR': '192.168.1.34'},
+        )
+        assert response.text == 'cached'
+    finally:
+        env_path.unlink()
