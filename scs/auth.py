@@ -26,7 +26,7 @@ from flask import Blueprint, request, abort, g
 from flask.blueprints import BlueprintSetupState
 import fastjsonschema
 
-from . import yaml, errors, tools
+from . import yaml, tools
 
 
 bp = Blueprint('auth', __name__)
@@ -202,7 +202,7 @@ def init(setup_state: BlueprintSetupState):
         ]
 
     for error_args in _ERRORS:
-        errors.register(*error_args)
+        setup_state.app.scs.register_error(*error_args)
     for audit_event_args in _AUDIT_EVENTS:
         setup_state.app.scs.register_audit_event(*audit_event_args)
 

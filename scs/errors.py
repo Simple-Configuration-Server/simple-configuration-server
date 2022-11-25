@@ -21,46 +21,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 import re
+import functools
 
-from flask import Blueprint, jsonify, Response
+from flask import Blueprint, jsonify, Response, Flask, current_app
+from flask.blueprints import BlueprintSetupState
 from werkzeug.exceptions import HTTPException
 
 bp = Blueprint('errors', __name__)
 
 _non_word_chars_regex = re.compile(r'\W+')
 
-_definitions = {
-    400: {
-        'bad-request': (
-            'Your request is invalid. For POST requests, check if the request'
-            'body contains valid JSON'
-        )
-    },
-    401: {
-        'unauthenticated': 'Invalid authentication credentials provided',
-    },
-    403: {
-        'unauthorized': (
-            'You are not authorized to access this resource'
-        ),
-    },
-    405: {
-        'method-not-allowed': (
-            'The HTTP request method cannot be used on this endpoint'
-        ),
-    },
-    500: {
-        'internal-server-error': (
-            'An internal server error occured'
-        )
-    }
-}
 
-# Filled by the register_exception() function
-_exception_ids = []
-
-
-def register(code: int, id_: str, message: str):
+def _register(code: int, id_: str, message: str, *, app: Flask):
     """
     Registers an error id for a specific HTTP response code. To trigger the
     error, pass the id as a description to the flask abort command, e.g.:
@@ -73,11 +45,13 @@ def register(code: int, id_: str, message: str):
             A unique identifier, returned in the JSON response
         message:
             The message that should be returned in the JSON response
+        app:
+            The application to register the id to
 
     Raises:
         ValueError: In case the given id_ is already registered for the code
     """
-    code_errors = _definitions.setdefault(code, {})
+    code_errors = app.scs._error_definitions.setdefault(code, {})
     if id_ in code_errors:
         raise ValueError(
             f'CONFLICT: id {id_} is already registered for code {code}',
@@ -86,8 +60,8 @@ def register(code: int, id_: str, message: str):
     code_errors[id_] = message
 
 
-def register_exception(
-        exception_class: type, id_: str, *, message: str = None,
+def _register_exception(
+        exception_class: type, id_: str, *, message: str = None, app: Flask,
         ):
     """
     Registers a specific error id to be returned, if the given exception is
@@ -109,13 +83,15 @@ def register_exception(
         message:
             Provide a message in case the given id is not yet registered for
             the 500 response code
+        app:
+            The app to register the exception on
 
     Raises:
         ValueError:
             In case the given Exception or id/message combination is already
             registered
     """
-    for existing_class, _ in _exception_ids:
+    for existing_class, _ in app.scs._exception_ids:
         if existing_class == exception_class:
             raise ValueError(
                 f'CONFLICT: Exception {exception_class.__name__} is already '
@@ -123,14 +99,52 @@ def register_exception(
             )
 
     if message is not None:
-        register(500, id_, message)
-    elif id_ not in _definitions[500]:
+        _register(500, id_, message, app=app)
+    elif id_ not in app.scs._error_definitions[500]:
         raise ValueError(
             f'Error id {id_} not registered as an error, so a message must'
             ' be provided'
         )
 
-    _exception_ids.append((exception_class, id_))
+    app.scs._exception_ids.append((exception_class, id_))
+
+
+@bp.record
+def init(setup_state: BlueprintSetupState):
+    """Initialize the errors module"""
+    setup_state.app.scs._error_definitions = {
+        400: {
+            'bad-request': (
+                'Your request is invalid. For POST requests, check if the '
+                'request body contains valid JSON'
+            )
+        },
+        401: {
+            'unauthenticated': 'Invalid authentication credentials provided',
+        },
+        403: {
+            'unauthorized': (
+                'You are not authorized to access this resource'
+            ),
+        },
+        405: {
+            'method-not-allowed': (
+                'The HTTP request method cannot be used on this endpoint'
+            ),
+        },
+        500: {
+            'internal-server-error': (
+                'An internal server error occured'
+            )
+        }
+    }
+    setup_state.app.scs._exception_ids = []
+    setup_state.app.scs.register_error = functools.partial(
+        _register, app=setup_state.app
+    )
+    setup_state.app.scs.register_exception = functools.partial(
+        _register_exception, app=setup_state.app
+    )
 
 
 def _error_response(code: int, id_: str, message: str) -> tuple[Response, int]:
@@ -157,8 +171,8 @@ def _get_500_error_id(error: Exception) -> str:
     """
     Returns the error id to use for the given exception
     """
-    id_ = next(iter(_definitions[500].keys()))
-    for exception_cls, error_id in _exception_ids:
+    id_ = next(iter(current_app.scs._error_definitions[500].keys()))
+    for exception_cls, error_id in current_app.scs._exception_ids:
         if isinstance(error.original_exception, exception_cls):
             id_ = error_id
             break
@@ -180,12 +194,12 @@ def json_error_response(e) -> tuple[Response, int]:
     """
     if e.code == 500:
         id_ = _get_500_error_id(e)
-        message = _definitions[e.code][id_]
-    elif e.code in _definitions:
-        id_ = next(iter(_definitions[e.code].keys()))
+        message = current_app.scs._error_definitions[e.code][id_]
+    elif e.code in current_app.scs._error_definitions:
+        id_ = next(iter(current_app.scs._error_definitions[e.code].keys()))
         if isinstance(e.description, dict):
             id_ = e.description.get('id', id_)
-        message = _definitions[e.code][id_]
+        message = current_app.scs._error_definitions[e.code][id_]
     else:
         id_ = _non_word_chars_regex.sub('-', e.name.lower())
         message = e.description

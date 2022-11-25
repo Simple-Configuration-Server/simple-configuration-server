@@ -32,7 +32,7 @@ import fastjsonschema
 from jinja2 import TemplateError, Environment
 from yaml import YAMLError
 
-from . import yaml, errors
+from . import yaml
 from .tools import get_object_from_name
 
 bp = Blueprint('configs', __name__, url_prefix='/configs')
@@ -190,11 +190,13 @@ def init(setup_state: BlueprintSetupState):
     bp.template_folder = _config_basepath
 
     for exc_class, error_id, error_msg in _EXCEPTIONS:
-        errors.register_exception(exc_class, error_id, message=error_msg)
+        setup_state.app.scs.register_exception(
+            exc_class, error_id, message=error_msg,
+        )
     for audit_event_args in _AUDIT_EVENTS:
         setup_state.app.scs.register_audit_event(*audit_event_args)
     for error_args in _ERRORS:
-        errors.register(*error_args)
+        setup_state.app.scs.register_error(*error_args)
 
     if enable_env_cache or check_templates:
         relative_config_template_paths = get_relative_endpoint_paths()
