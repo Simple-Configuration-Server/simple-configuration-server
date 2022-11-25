@@ -34,9 +34,9 @@ from validate import main  # noqa: E402
 
 file_dir = Path(__file__).parent.absolute()
 config_dir = Path(file_dir, 'data/1')
-os.environ['SCS_CONFIG_DIR'] = config_dir.as_posix()
 
 
 def test_validation_succeeds():
     """The provided configuration is valid"""
+    os.environ['SCS_CONFIG_DIR'] = config_dir.as_posix()
     main()

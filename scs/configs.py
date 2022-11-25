@@ -124,6 +124,7 @@ def init(setup_state: BlueprintSetupState):
         scs_configuration['directories']['config']
     ).absolute()
     setup_state.app.scs.config_basepath = config_basepath
+    setup_state.app.template_folder = config_basepath
     common_basepath = Path(
         scs_configuration['directories']['common']
     ).absolute()
@@ -187,8 +188,6 @@ def init(setup_state: BlueprintSetupState):
         setup_state.app.jinja_env.add_extension(jinja_extension_def['name'])
     setup_state.app.scs.jinja_extension_definitions = \
         jinja_extension_definitions
-
-    bp.template_folder = config_basepath
 
     for exc_class, error_id, error_msg in _EXCEPTIONS:
         setup_state.app.scs.register_exception(

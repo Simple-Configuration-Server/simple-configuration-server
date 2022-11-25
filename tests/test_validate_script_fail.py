@@ -34,13 +34,13 @@ from validate import main  # noqa: E402
 
 file_dir = Path(__file__).parent.absolute()
 config_dir = Path(file_dir, 'data/2')
-os.environ['SCS_CONFIG_DIR'] = config_dir.as_posix()
 
 
 def test_validation_fails():
     """A wrong text response is defined for one of the endpoints"""
     validation_failed = False
     try:
+        os.environ['SCS_CONFIG_DIR'] = config_dir.as_posix()
         main()
     except AssertionError as e:
         validation_failed = True
