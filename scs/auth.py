@@ -22,7 +22,7 @@ import ipaddress
 import datetime
 import logging
 
-from flask import Blueprint, request, abort, g
+from flask import Blueprint, request, abort, g, current_app
 from flask.blueprints import BlueprintSetupState
 import fastjsonschema
 
@@ -130,8 +130,6 @@ def init(setup_state: BlueprintSetupState):
                     whitelist: list[str]
                 max_auth_fails_per_15_min: bool
     """
-    global _auth_mapping, _rate_limiter, _global_whitelist
-
     options = setup_state.options
     users_file_path = Path(options['users_file'])
     private_networks_only = options['networks']['private_only']
@@ -142,7 +140,7 @@ def init(setup_state: BlueprintSetupState):
         'reject_keys_containing_dots'
     ]
 
-    _rate_limiter = _RateLimiter(
+    setup_state.app.scs._auth_rate_limiter = _RateLimiter(
         max_auth_fails_per_15_min=max_auth_fails_per_15_min
     )
 
@@ -166,17 +164,18 @@ def init(setup_state: BlueprintSetupState):
     yaml.serialize_secrets(scs_users)
     scs_users = validate_user_configuration(scs_users)
 
-    _global_whitelist = [
+    global_whitelist = [
         ipaddress.ip_network(network) for network in network_whitelist
     ]
 
     if private_networks_only:
-        for network in _global_whitelist:
+        for network in global_whitelist:
             if not network.is_private:
                 raise ValueError(
                     'private_only enabled, but globally whitelisted '
                     f'{str(network)} is not private!'
                 )
+    setup_state.app.scs._auth_global_whitelist = global_whitelist
 
     _auth_mapping = {}
     for user in scs_users:
@@ -184,7 +183,7 @@ def init(setup_state: BlueprintSetupState):
         parsed_whitelist = []
         for item in user['has_access']['from_networks']:
             network = ipaddress.ip_network(item)
-            if not _is_whitelisted(network, _global_whitelist):
+            if not _is_whitelisted(network, global_whitelist):
                 raise ValueError(
                     f"Network {str(network)} of user '{user['id']} "
                     "is not globally whitelisted!"
@@ -200,6 +199,7 @@ def init(setup_state: BlueprintSetupState):
             tools.build_pattern_from_path(p)
             for p in user['has_access']['to_paths']
         ]
+    setup_state.app.scs._auth_mapping = _auth_mapping
 
     for error_args in _ERRORS:
         setup_state.app.scs.register_error(*error_args)
@@ -238,24 +238,26 @@ def check_auth():
     user is authorized to make the request.
     """
     user_ip = ipaddress.ip_network(request.remote_addr)
-    if not _is_whitelisted(user_ip, _global_whitelist):
+    if not _is_whitelisted(user_ip, current_app.scs._auth_global_whitelist):
         # Check the global whitelist before hitting the rate-limiter, so
         # non-whitelisted IPs cannot be used to reduce the changes of rate
         # limiting. The failed attempt is not logs, since otherwise attackers
         # could flood the logs
         abort(403, description={'id': 'unauthorized-ip'})
 
-    if _rate_limiter.is_limited(request.remote_addr):
+    if current_app.scs._auth_rate_limiter.is_limited(request.remote_addr):
         g.add_audit_event(event_type='rate-limited')
         abort(429, description={'id': 'auth-rate-limited'})
 
     try:
         auth_header = request.headers['Authorization']
         token = auth_header.removeprefix('Bearer ')
-        user = _auth_mapping[token]
+        user = current_app.scs._auth_mapping[token]
         g.user_id = user['id']
     except KeyError:
-        _rate_limiter.register_attempt(request.remote_addr)
+        current_app.scs._auth_rate_limiter.register_attempt(
+            request.remote_addr
+        )
         g.add_audit_event(event_type='unauthenticated')
         abort(401)
 
