@@ -19,9 +19,9 @@ properties:
       rendering_options:
         type: object
         description:
-          When provided, the jinja.overlay function is used to create a dedicated
-          jinja_env for the endpoint, that updates the default rendering options
-          with the provided rendering options
+          When provided, the rendering options defined in scs-configuration.yaml
+          are updated with these, and a new environment is initialized
+          specifically for this endpoint.
         default: {}
       enabled:
         type: boolean

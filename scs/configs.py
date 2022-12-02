@@ -29,7 +29,7 @@ from flask import (
 )
 from flask.blueprints import BlueprintSetupState
 import fastjsonschema
-from jinja2 import TemplateError, Environment
+from jinja2 import TemplateError, Environment, FileSystemLoader
 from yaml import YAMLError
 
 from . import yaml
@@ -124,7 +124,6 @@ def init(setup_state: BlueprintSetupState):
         scs_configuration['directories']['endpoints']
     ).absolute()
     setup_state.app.scs.endpoints_basepath = endpoints_basepath
-    setup_state.app.template_folder = endpoints_basepath
     common_basepath = Path(
         scs_configuration['directories']['common']
     ).absolute()
@@ -175,17 +174,25 @@ def init(setup_state: BlueprintSetupState):
 
     setup_state.app.scs.EnvFileLoader = SCSEnvFileLoader
 
+    # OPTIMIZE: May be good to subclass the Environment to take extra
+    # parameters, and include the 'split_jinja_env_options' in the subclass
     # Native env options should be passed at init, non-native ones should be
     # applied using extend to ensure no built-in properties are overriden
     native_env_options, extend_env_options = split_jinja_env_options(
         default_rendering_options
     )
-    setup_state.app.jinja_options.update(native_env_options)
-    setup_state.app.jinja_env.extend(**extend_env_options)
-
+    loader = FileSystemLoader(endpoints_basepath)
+    jinja_env = Environment(
+        loader=loader,
+        **native_env_options,
+    )
+    jinja_env.extend(**extend_env_options)
     jinja_extension_definitions = scs_configuration['extensions']['jinja2']
     for jinja_extension_def in jinja_extension_definitions:
-        setup_state.app.jinja_env.add_extension(jinja_extension_def['name'])
+        jinja_env.add_extension(jinja_extension_def['name'])
+    setup_state.app.scs.configs_jinja_env = jinja_env
+    # Store below to initialize environments on the fly if custom rendering
+    # options are defined for an endpoint
     setup_state.app.scs.jinja_extension_definitions = \
         jinja_extension_definitions
 
@@ -211,7 +218,9 @@ def init(setup_state: BlueprintSetupState):
             if env['request']['schema']:
                 fastjsonschema.compile(env['request']['schema'])
             if check_templates and env['template']['enabled']:
-                template = setup_state.app.jinja_env.get_template(
+                # FIX: This does not use the endpoint specific
+                # rendering options
+                template = jinja_env.get_template(
                     relative_url.lstrip('/')
                 )
                 template.render(**env['template']['context'])
@@ -455,6 +464,7 @@ def view_config_file(path: str) -> Response:
         env['template']['context'].update(request.get_json(force=True))
 
     if env['template']['enabled']:
+        configs_jinja_env = current_app.scs.configs_jinja_env
         if additional_options := env['template']['rendering_options']:
             # Since it should be supported to override properties that are
             # initially set using .extend, create a completely new environment
@@ -467,14 +477,14 @@ def view_config_file(path: str) -> Response:
             native_env_options, extend_env_options = split_jinja_env_options(
                 combined_options
             )
-            native_env_options['loader'] = current_app.jinja_env.loader
+            native_env_options['loader'] = configs_jinja_env.loader
             jinja_env = Environment(**native_env_options)
             jinja_env.extend(**extend_env_options)
             extension_definitions = current_app.scs.jinja_extension_definitions
             for jinja_extension_def in extension_definitions:
                 jinja_env.add_extension(jinja_extension_def['name'])
         else:
-            jinja_env = current_app.jinja_env
+            jinja_env = configs_jinja_env
 
         template = jinja_env.get_template(path.lstrip('/'))
         rendered_template = template.render(env['template']['context'])
