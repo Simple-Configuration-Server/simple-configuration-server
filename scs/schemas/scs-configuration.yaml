@@ -10,15 +10,13 @@ required:
 properties:
   directories:
     description:
-      The directories used to load the configuration files, environments and
+      The directories used to load the endpoint data/templates, environments and
       secrets from
     type: object
     additionalProperties: false
     required:
       - common
-      - config
-      # If you don't use the builtin secrets management, you may ignore this
-      # variable
+      - endpoints
     properties:
       common:
         type: string
@@ -33,10 +31,10 @@ properties:
           this directory can be referenced from environment files using the
           '!scs-secret' YAML tag. If you don't use this YAML tag, but rather
           another constructor to reference secrets, this variable is optional
-      config:
+      endpoints:
         type: string
         description:
-          Path containing the configuration file templates and their
+          Path containing the endpoint templates and their
           corresponding environment (*scs-env.yaml) files.
   
   

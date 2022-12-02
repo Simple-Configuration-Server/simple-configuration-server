@@ -186,7 +186,7 @@ def test_without_templating():
 
     # Check contents
     actual_path = Path(
-        config_dir, 'config/elasticsearch/elasticsearch_template.yml'
+        config_dir, 'endpoints/elasticsearch/elasticsearch_template.yml'
     )
     with open(actual_path, 'r', encoding='utf8') as textfile:
         original_file_contents = textfile.read()
@@ -214,7 +214,7 @@ def test_cache():
     assert response.text == ''
 
     env_path = Path(
-        config_dir, 'config/elasticsearch/cache_test.scs-env.yaml'
+        config_dir, 'endpoints/elasticsearch/cache_test.scs-env.yaml'
     )
     with open(env_path, 'w', encoding='utf8') as yamlfile:
         yaml.dump({'template': {'context': {'cache_var': 'cached'}}}, yamlfile)

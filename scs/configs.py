@@ -120,17 +120,17 @@ def init(setup_state: BlueprintSetupState):
     """Initializes the blueprint"""
     scs_configuration = setup_state.app.config['SCS']
 
-    config_basepath = Path(
-        scs_configuration['directories']['config']
+    endpoints_basepath = Path(
+        scs_configuration['directories']['endpoints']
     ).absolute()
-    setup_state.app.scs.config_basepath = config_basepath
-    setup_state.app.template_folder = config_basepath
+    setup_state.app.scs.endpoints_basepath = endpoints_basepath
+    setup_state.app.template_folder = endpoints_basepath
     common_basepath = Path(
         scs_configuration['directories']['common']
     ).absolute()
-    if not config_basepath.is_dir():
+    if not endpoints_basepath.is_dir():
         raise ValueError(
-            'The provided directories.config path does not exist!'
+            'The provided directories.endpoints path does not exist!'
         )
     if not common_basepath.is_dir():
         raise ValueError(
@@ -199,10 +199,10 @@ def init(setup_state: BlueprintSetupState):
         setup_state.app.scs.register_error(*error_args)
 
     if enable_env_cache or check_templates:
-        relative_config_template_paths = get_relative_endpoint_paths(
-            config_basepath
+        relative_endpoint_template_paths = get_relative_endpoint_paths(
+            endpoints_basepath
         )
-        for relative_url in relative_config_template_paths:
+        for relative_url in relative_endpoint_template_paths:
             with setup_state.app.app_context():
                 env = yaml.SecretsSerializedDict(
                     _load_environment(relative_url.lstrip('/'))
@@ -291,7 +291,8 @@ def _load_env_file(relative_path: str) -> dict:
     Load the data from the given env file, if it exists
 
     Args:
-        relative_path: The path of env file, relative to the config directory
+        relative_path:
+            The path of env file, relative to the endpoints directory
 
     Raises:
         EnvFileFormatException in case the env file does not pass JSON-schema
@@ -301,7 +302,7 @@ def _load_env_file(relative_path: str) -> dict:
         The parsed env file data (Note that defauls are not filled, since files
         are combined in the _load_environment function)
     """
-    path = Path(current_app.scs.config_basepath, relative_path)
+    path = Path(current_app.scs.endpoints_basepath, relative_path)
     if not path.is_file():
         return {}
 
@@ -335,7 +336,7 @@ def _get_env_file_hierarchy(relative_path: str) -> list[str]:
     Args:
         relative_path:
             The path of the template to get the env files for, relative to the
-            config directory
+            endpoints directory
 
     Returns:
         A list of the possible relative paths of scs-env files
@@ -359,7 +360,8 @@ def _load_environment(relative_path: str):
 
     Args:
         relative_path:
-            The path of the template/endpoint, relative to the config directory
+            The path of the template/endpoint, relative to the endpoints
+            directory
     Returns:
         The combined environment data of all environment files applicable to
         the template
@@ -379,22 +381,22 @@ def _load_environment(relative_path: str):
     return combined_env
 
 
-def get_relative_endpoint_paths(config_basepath: Path) -> list[str]:
+def get_relative_endpoint_paths(endpoints_basepath: Path) -> list[str]:
     """
     Gets the relative paths of all endpoints
 
     Returns:
         List of all relative paths of available endpoints/templates under the
-        config directory
+        endpoints directory
     """
-    config_template_paths = []
-    for path in config_basepath.rglob('*'):
+    endpoint_template_paths = []
+    for path in endpoints_basepath.rglob('*'):
         if path.is_file() and not path.name.endswith('scs-env.yaml'):
             relative_template_path = \
-                path.as_posix().removeprefix(config_basepath.as_posix())
-            config_template_paths.append(relative_template_path)
+                path.as_posix().removeprefix(endpoints_basepath.as_posix())
+            endpoint_template_paths.append(relative_template_path)
 
-    return config_template_paths
+    return endpoint_template_paths
 
 
 def _endpoint_exists(path: str) -> bool:
@@ -416,7 +418,7 @@ def _endpoint_exists(path: str) -> bool:
     if path.endswith('scs-env.yaml'):
         return False
 
-    full_path = Path(current_app.scs.config_basepath, path)
+    full_path = Path(current_app.scs.endpoints_basepath, path)
 
     return full_path.is_file()
 
@@ -480,7 +482,10 @@ def view_config_file(path: str) -> Response:
         response = make_response(rendered_template)
         response.headers.clear()  # Removes the default 'html' content type
     else:
-        response = send_from_directory(current_app.scs.config_basepath, path)
+        response = send_from_directory(
+            current_app.scs.endpoints_basepath,
+            path,
+        )
 
     response.headers.update(env['response']['headers'])
     response.status = env['response']['status']

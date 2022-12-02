@@ -209,7 +209,7 @@ def main():
     all_test_paths = [
         f'/configs/{p.lstrip("/")}'.lower()
         for p in scs.configs.get_relative_endpoint_paths(
-            app.scs.config_basepath
+            app.scs.endpoints_basepath
         )
     ]
 
