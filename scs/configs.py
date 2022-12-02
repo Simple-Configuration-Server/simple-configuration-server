@@ -36,12 +36,6 @@ from . import yaml
 from .tools import get_object_from_name
 
 bp = Blueprint('configs', __name__, url_prefix='/configs')
-native_rendering_options = set(
-    inspect.getfullargspec(Environment.__init__).args
-)
-native_rendering_options.difference_update([
-    'loader', 'extensions', 'undefined',
-])
 
 _AUDIT_EVENTS = [
     (
@@ -97,22 +91,37 @@ class EnvironmentFileCache:
         self._cache[abspath] = copy.deepcopy(data)
 
 
-def split_jinja_env_options(options: dict) -> tuple[dict, dict]:
+class ConfigsJinjaEnv(Environment):
     """
-    Split the provided jinja environment options into (1) options that are
-    natively supported, and can therefore be provided at environment init,
-    and (2) other options that are not officially supported, and should be
-    added after init using the .extend method
+    Extends jinja2.environment by enabling passing additional attributes
+    at initialization, that should normally be set seperately via the
+    extend method
     """
-    native_options = {}
-    non_native_options = {}
-    for key, value in options.items():
-        if key in native_rendering_options:
-            native_options[key] = value
-        else:
-            non_native_options[key] = value
+    _native_env_kwargs = frozenset(
+        inspect.getfullargspec(Environment.__init__).args
+    )
 
-    return (native_options, non_native_options)
+    def __init__(self, *args, **kwargs):
+        native_kwargs, extend_options = self._split_init_kwargs(kwargs)
+        super().__init__(*args, **native_kwargs)
+        self.extend(**extend_options)
+
+    def _split_init_kwargs(self, options: dict) -> tuple[dict, dict]:
+        """
+        Split the provided jinja environment keyword arguments into (1) options
+        that are natively supported, and can therefore be passed at environment
+        init, and (2) other options that are not officially supported, and
+        should be added after init using the .extend method
+        """
+        native_options = {}
+        non_native_options = {}
+        for key, value in options.items():
+            if key in self._native_env_kwargs:
+                native_options[key] = value
+            else:
+                non_native_options[key] = value
+
+        return (native_options, non_native_options)
 
 
 @bp.record
@@ -174,27 +183,14 @@ def init(setup_state: BlueprintSetupState):
 
     setup_state.app.scs.EnvFileLoader = SCSEnvFileLoader
 
-    # OPTIMIZE: May be good to subclass the Environment to take extra
-    # parameters, and include the 'split_jinja_env_options' in the subclass
-    # Native env options should be passed at init, non-native ones should be
-    # applied using extend to ensure no built-in properties are overriden
-    native_env_options, extend_env_options = split_jinja_env_options(
-        default_rendering_options
+    jinja_env = ConfigsJinjaEnv(
+        loader=FileSystemLoader(endpoints_basepath),
+        **default_rendering_options,
     )
-    loader = FileSystemLoader(endpoints_basepath)
-    jinja_env = Environment(
-        loader=loader,
-        **native_env_options,
-    )
-    jinja_env.extend(**extend_env_options)
     jinja_extension_definitions = scs_configuration['extensions']['jinja2']
     for jinja_extension_def in jinja_extension_definitions:
         jinja_env.add_extension(jinja_extension_def['name'])
     setup_state.app.scs.configs_jinja_env = jinja_env
-    # Store below to initialize environments on the fly if custom rendering
-    # options are defined for an endpoint
-    setup_state.app.scs.jinja_extension_definitions = \
-        jinja_extension_definitions
 
     for exc_class, error_id, error_msg in _EXCEPTIONS:
         setup_state.app.scs.register_exception(
@@ -474,13 +470,12 @@ def view_config_file(path: str) -> Response:
                 current_app.scs.default_rendering_options
             )
             combined_options.update(additional_options)
-            native_env_options, extend_env_options = split_jinja_env_options(
-                combined_options
+            jinja_env = ConfigsJinjaEnv(
+                loader=configs_jinja_env.loader,
+                **combined_options,
             )
-            native_env_options['loader'] = configs_jinja_env.loader
-            jinja_env = Environment(**native_env_options)
-            jinja_env.extend(**extend_env_options)
-            extension_definitions = current_app.scs.jinja_extension_definitions
+            extension_definitions = \
+                current_app.config['SCS']['extensions']['jinja2']
             for jinja_extension_def in extension_definitions:
                 jinja_env.add_extension(jinja_extension_def['name'])
         else:
