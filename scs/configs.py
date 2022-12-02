@@ -204,12 +204,13 @@ def init(setup_state: BlueprintSetupState):
         )
         for relative_url in relative_config_template_paths:
             with setup_state.app.app_context():
-                env = _load_environment(relative_url.lstrip('/'))
+                env = yaml.SecretsSerializedDict(
+                    _load_environment(relative_url.lstrip('/'))
+                )
             # If request.schema is defined, check if it's able to parse
             if env['request']['schema']:
                 fastjsonschema.compile(env['request']['schema'])
             if check_templates and env['template']['enabled']:
-                yaml.serialize_secrets(env)
                 template = setup_state.app.jinja_env.get_template(
                     relative_url.lstrip('/')
                 )
@@ -436,7 +437,7 @@ def view_config_file(path: str) -> Response:
     if not _endpoint_exists(path):
         abort(404)
 
-    env = _load_environment(path)
+    env = yaml.SecretsSerializedDict(_load_environment(path))
 
     if request.method not in env['request']['methods']:
         abort(405)
@@ -450,8 +451,6 @@ def view_config_file(path: str) -> Response:
                 abort(400, description={'id': 'request-body-invalid'})
 
         env['template']['context'].update(request.get_json(force=True))
-
-    secret_ids = yaml.serialize_secrets(env)
 
     if env['template']['enabled']:
         if additional_options := env['template']['rendering_options']:
@@ -487,9 +486,9 @@ def view_config_file(path: str) -> Response:
     response.status = env['response']['status']
 
     g.add_audit_event(event_type='config-loaded')
-    if secret_ids:
+    if env.secrets:
         g.add_audit_event(
-            event_type='secrets-loaded', secrets=list(secret_ids),
+            event_type='secrets-loaded', secrets=env.secrets,
         )
 
     return response

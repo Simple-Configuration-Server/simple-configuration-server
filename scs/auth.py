@@ -234,9 +234,10 @@ def init(setup_state: BlueprintSetupState):
     SCSUsersFileLoader.add_constructor(
         secrets_constructor.tag, secrets_constructor.construct
     )
-    scs_users = yaml.load_file(users_file_path, loader=SCSUsersFileLoader)
-    yaml.serialize_secrets(scs_users)
-    scs_users = validate_user_configuration(scs_users)
+    scs_users = yaml.SecretsSerializedList(
+        yaml.load_file(users_file_path, loader=SCSUsersFileLoader)
+    )
+    scs_users = validate_user_configuration(scs_users.data)
 
     global_whitelist = NetworkWhitelist(
         network_whitelist, private_only=private_networks_only,

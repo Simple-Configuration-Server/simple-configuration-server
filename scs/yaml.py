@@ -23,6 +23,7 @@ import os
 from pathlib import Path
 import secrets
 from random import randint
+from collections import UserDict, UserList
 
 from yaml import Loader, Node, SafeLoader, dump, safe_load
 
@@ -222,36 +223,62 @@ class SCSSecret:
         self.value = value
 
 
-def serialize_secrets(data: dict | list) -> list[str]:
+class SecretsSerializedObject:
     """
-    Serialize all secrets in the data (In-place)
+    Object with a copy of the input data containing SCSSecret objects
+    in which these objects are replaced by their .value attribute
 
-    Args:
+    Attributes:
         data:
-            Data structure possibly containing nested 'SCSSecret' objects,
-            which are then serialized IN PLACE.
-
-    Returns:
-        The id's of the secrets that were serialized
+            The copy of the input data with secrets serialized
+        secrets:
+            A list of strings containing the .id attributes of each serialized
+            secret
     """
-    secret_ids = set()
-    if isinstance(data, list):
-        for i, item in enumerate(data):
-            if isinstance(item, SCSSecret):
-                secret_ids.add(item.id)
-                data[i] = item.value
-            else:
-                serialize_secrets(item)
-    elif isinstance(data, dict):
-        for key, value in data.items():
-            if isinstance(value, (dict, list)):
-                serialized_secrets = serialize_secrets(value)
-                secret_ids.update(serialized_secrets)
-            elif isinstance(value, SCSSecret):
-                secret_ids.add(value.id)
-                data[key] = value.value
+    def __init__(self, data: Any):
+        self.data, secrets_set = self._serialize_secrets(data)
+        self.secrets = list(secrets_set)
 
-    return secret_ids
+    def _serialize_secrets(self, data: Any) -> tuple[Any, list[str]]:
+        """
+        Serialize SCSSecrets in the data (replace by .value)
+
+        Args:
+            data:
+                Data structure possibly containing nested 'SCSSecret' objects
+
+        Returns:
+            A new object with the secrets serialized and a list of the
+            id's of each serialized secret
+        """
+        secret_ids = set()
+        if isinstance(data, SCSSecret):
+            secret_ids.add(data.id)
+            serialized_data = data.value
+        elif isinstance(data, list):
+            serialized_data = []
+            for item in data:
+                serialized_item, sids = self._serialize_secrets(item)
+                serialized_data.append(serialized_item)
+                secret_ids.update(sids)
+        elif isinstance(data, dict):
+            serialized_data = {}
+            for key, value in data.items():
+                serialized_value, sids = self._serialize_secrets(value)
+                serialized_data[key] = serialized_value
+                secret_ids.update(sids)
+        else:
+            serialized_data = data
+
+        return serialized_data, secret_ids
+
+
+class SecretsSerializedDict(SecretsSerializedObject, UserDict):
+    pass
+
+
+class SecretsSerializedList(SecretsSerializedObject, UserList):
+    pass
 
 
 class SCSSecretConstructor(RelativePathMixin, SCSYamlTagConstructor):
