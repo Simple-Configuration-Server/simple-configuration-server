@@ -113,6 +113,80 @@ class _RateLimiter:
         return f'{now.year}{now.month}{now.day}{now.hour}{minute_rounded}'
 
 
+class NetworkWhitelist:
+    """
+    A network whitelist with a method to check if another network is included
+    in the whitelist
+    """
+    def __init__(self, networks: list[str], private_only: bool = False):
+        """
+        Initialzes the NetworkWhitelist instance
+
+        Args:
+            networks:
+                List with specific IPs, Subnet CIDR notations or both. All
+                items are passed to the ipaddress.ip_network() function.
+
+            private_only:
+                If True, the networks must contain only private subnets
+        """
+        self.ipv4_networks = []
+        self.ipv6_networks = []
+        for network in networks:
+            ip_network = ipaddress.ip_network(network)
+            if private_only and not ip_network.is_private:
+                raise ValueError(
+                    f'private_only enabled, but network {network} is not private!'  # noqa:E501
+                )
+            if isinstance(ip_network, ipaddress.IPv4Network):
+                self.ipv4_networks.append(ip_network)
+            else:
+                self.ipv6_networks.append(ip_network)
+
+    def contains(self, network: str) -> bool:
+        """
+        Check if the whitelist contains the provided network
+
+        Args:
+            network:
+                A specific IP or CIDR notation
+        """
+        ip_network = ipaddress.ip_network(network)
+        if isinstance(ip_network, ipaddress.IPv4Network):
+            whitelist = self.ipv4_networks
+        else:
+            whitelist = self.ipv6_networks
+
+        for whitelisted_network in whitelist:
+            if ip_network.subnet_of(whitelisted_network):
+                return True
+
+        return False
+
+    def issubset(self, other_network_whitelist) -> bool:
+        """
+        Checks if this whitelist is fully covered by another whitelist
+
+        Args:
+            network_whitelist:
+                Another NetworkWhitelist instance
+        """
+        network_types = ['ipv4_networks', 'ipv6_networks']
+        for network_type in network_types:
+            networks = getattr(self, network_type)
+            other_networks = getattr(other_network_whitelist, network_type)
+            for network in networks:
+                is_subnet_of_other = False
+                for other_network in other_networks:
+                    if network.subnet_of(other_network):
+                        is_subnet_of_other = True
+                        break
+                if not is_subnet_of_other:
+                    return False
+
+        return True
+
+
 @bp.record
 def init(setup_state: BlueprintSetupState):
     """
@@ -164,36 +238,23 @@ def init(setup_state: BlueprintSetupState):
     yaml.serialize_secrets(scs_users)
     scs_users = validate_user_configuration(scs_users)
 
-    global_whitelist = [
-        ipaddress.ip_network(network) for network in network_whitelist
-    ]
+    global_whitelist = NetworkWhitelist(
+        network_whitelist, private_only=private_networks_only,
+    )
 
-    if private_networks_only:
-        for network in global_whitelist:
-            if not network.is_private:
-                raise ValueError(
-                    'private_only enabled, but globally whitelisted '
-                    f'{str(network)} is not private!'
-                )
     setup_state.app.scs._auth_global_whitelist = global_whitelist
 
     _auth_mapping = {}
     for user in scs_users:
         _auth_mapping[user.pop('token')] = user
-        parsed_whitelist = []
-        for item in user['has_access']['from_networks']:
-            network = ipaddress.ip_network(item)
-            if not _is_whitelisted(network, global_whitelist):
-                raise ValueError(
-                    f"Network {str(network)} of user '{user['id']} "
-                    "is not globally whitelisted!"
-                )
-            if private_networks_only and not network.is_private:
-                raise ValueError(
-                    f"Network {str(network)} of user '{user['id']} "
-                    "is not private, but private_only is enabled!"
-                )
-            parsed_whitelist.append(network)
+        parsed_whitelist = NetworkWhitelist(
+            user['has_access']['from_networks']
+        )
+        if not parsed_whitelist.issubset(global_whitelist):
+            raise ValueError(
+                f'Network whitelist of user {user["id"]} not fully covered'
+                ' by global whitelist'
+            )
         user['has_access']['from_networks'] = parsed_whitelist
         user['has_access']['to_paths'] = [
             tools.build_pattern_from_path(p)
@@ -207,38 +268,13 @@ def init(setup_state: BlueprintSetupState):
         setup_state.app.scs.register_audit_event(*audit_event_args)
 
 
-def _is_whitelisted(
-        network: ipaddress._BaseNetwork,
-        whitelist: list[ipaddress._BaseNetwork]
-        ) -> bool:
-    """
-    Returns true if the network a subnet of any of the networks in the
-    whitelist
-
-    Args:
-        network: The network to check
-        whitelist: The whitelist the network should be fully within
-
-    Returns:
-        Whether the given network is a subnet of any of the networks in the
-        whitelist
-    """
-    network_type = type(network)  # Ipv4 or Ipv6 network
-    for wl_network in whitelist:
-        if network_type is type(wl_network) and network.subnet_of(wl_network):
-            return True
-    else:
-        return False
-
-
 @bp.before_app_request
 def check_auth():
     """
     Validates if user authentication credentials are valid, and if the given
     user is authorized to make the request.
     """
-    user_ip = ipaddress.ip_network(request.remote_addr)
-    if not _is_whitelisted(user_ip, current_app.scs._auth_global_whitelist):
+    if not current_app.scs._auth_global_whitelist.contains(request.remote_addr):  # noqa:E501
         # Check the global whitelist before hitting the rate-limiter, so
         # non-whitelisted IPs cannot be used to reduce the changes of rate
         # limiting. The failed attempt is not logs, since otherwise attackers
@@ -261,7 +297,7 @@ def check_auth():
         g.add_audit_event(event_type='unauthenticated')
         abort(401)
 
-    if not _is_whitelisted(user_ip, user['has_access']['from_networks']):
+    if not user['has_access']['from_networks'].contains(request.remote_addr):
         g.add_audit_event(event_type='unauthorized-ip')
         abort(403, description={'id': 'unauthorized-ip'})
 
