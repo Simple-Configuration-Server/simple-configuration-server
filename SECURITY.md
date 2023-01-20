@@ -113,7 +113,7 @@ Please note the following when deploying SCS:
   file handler to prevent the file-system from overflowing. To be able to trace
   access attempts and access to secrets, make sure logs are archived before
   this happens, for example by using the log centralization strategy described
-  in the [documentation](https://simple-configuration-server.github.io/docs/deployment/log-centralization).
+  in the [documentation](https://simple-configuration-server.com/docs/deployment/log-centralization).
   By streaming the audit logs to a database, you can enable monitoring, for
   example to receive notifications in case many failed access attempts are
   detected in a short period of time.

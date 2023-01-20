@@ -32,7 +32,7 @@ file-server. Unlike simple file-servers however, SCS offers the following:
        functions and tags inside your configuration file templates.
 
 Please find the the full documentation, including usage examples, on the
-[Simple Configuration Server Website](https://simple-configuration-server.github.io/).
+[Simple Configuration Server Website](https://simple-configuration-server.com/).
 
 This project is developed in the [Python programming language](https://www.python.org/about/)
 using the [Flask Framework](https://flask.palletsprojects.com/), and
@@ -45,7 +45,7 @@ used to validate loaded files using JSON schemas. The Docker image uses the
 ## Development
 This section describes how you can contribute to the development of core
 SCS features. For instructions on developing extensions for SCS, please refer
-to the [extensions documentation](https://simple-configuration-server.github.io/extensions).
+to the [extensions documentation](https://simple-configuration-server.com/extensions).
 
 _Note: For the process and checklist of contributing changes to this
 repository, please see [CONTRIBUTING.md](CONTRIBUTING.md). If you find any
