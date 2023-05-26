@@ -56,7 +56,7 @@ to report them._
 To work on the core SCS code, you'll need:
 
 * A unix operating system (Windows should also work, but not using these steps)
-* Python 3.10 installed (Test using `python3.11 --version`)
+* Python 3.11 installed (Test using `python3.11 --version`)
 
 After creating a fork and cloning the repository locally:
 1. Open a terminal in the root directory of this repository
