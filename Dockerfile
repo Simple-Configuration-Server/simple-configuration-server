@@ -1,4 +1,4 @@
-FROM python:3.10 AS builder
+FROM python:3.11 AS builder
 RUN adduser --disabled-password --gecos "scs,0,000,000" scs
 USER scs
 WORKDIR /build
@@ -8,7 +8,7 @@ COPY --chown=scs:scs requirements.txt .
 RUN pip install --user --no-warn-script-location -r requirements.txt
 
 # Now build a compact image
-FROM python:3.10-slim
+FROM python:3.11-slim
 RUN adduser --disabled-password --gecos "scs,0,000,000" scs
 # Create and own required directories
 RUN mkdir -p /etc/scs /var/log/scs

@@ -3,7 +3,7 @@ set -e
 
 # Validate python version consistency in repository
 # Dockerfile and CI/CD
-PYTHON_VERSION=3.10
+PYTHON_VERSION=3.11
 
 DOCKERFILE_CONTENTS=$(cat Dockerfile)
 CICDFILE_CONTENTS=$(cat ./.github/workflows/main.yml)
